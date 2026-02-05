@@ -1,0 +1,9 @@
+{
+  "expo": {
+    "name": "CHAMBA / ShambaSmart",
+    "slug": "shambasmart",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light"
+  }
+}

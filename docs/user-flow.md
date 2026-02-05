@@ -1,28 +1,8 @@
-# Fluxo do utilizador (MVP)
+# Fluxo de utilizador (MVP)
 
-1. **Onboarding rápido**
-   - Escolhe papel: camponês, comprador, transportador, estudante.
-   - Informa localização e culturas principais.
-
-2. **Tela inicial / dashboard**
-   - Exibe clima, estradas, alertas e dica diária.
-   - Atalhos para marketplace e transporte.
-
-3. **Marketplace**
-   - Publicar anúncio com foto, preço, local e disponibilidade.
-   - Comprador toca em "Tenho interesse".
-   - Se offline, interação vai para fila local.
-
-4. **Logística**
-   - Produtor cria pedido com origem e destino.
-   - API retorna preço sugerido e estado de matching.
-
-5. **Feed inteligente**
-   - Notícias locais, programas de apoio e casos de sucesso.
-
-6. **Perfil + reputação**
-   - Histórico de vendas e avaliações.
-   - Medalhas por consistência e impacto.
-
-7. **Modo estudante**
-   - Micro-cursos com progresso e badge digital.
+1. **Onboarding simples** com seleção de perfil (Camponês/Comprador/Transportador/Estudante).
+2. **Dashboard** apresenta localização, clima, estradas e alertas.
+3. **Marketplace** permite criar/visualizar anúncios e marcar interesse.
+4. **Logística** conecta produtor a transportador com preço sugerido.
+5. **Perfil** mostra reputação e histórico de transações.
+6. **Modo estudante** libera micro-cursos e medalhas digitais.

@@ -1,0 +1,40 @@
+:root {
+  font-family: 'Poppins', 'Montserrat', system-ui, sans-serif;
+  color: #1a1a1a;
+  background: #f5faf6;
+}
+
+body {
+  margin: 0;
+}
+
+.container {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.hero {
+  background: linear-gradient(135deg, #4caf50, #6a1b9a);
+  color: white;
+  border-radius: 16px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+.card {
+  background: white;
+  border-radius: 12px;
+  padding: 1rem;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+}
+
+h1, h2 {
+  margin-top: 0;
+}
