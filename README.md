@@ -1,32 +1,68 @@
-# CHAMBA / ShambaSmart MVP
+# CHAMBA / ShambaSmart
 
-"Onde o campo encontra oportunidades".
+> **Onde o campo encontra oportunidades.**
 
-Monorepo base com:
-- `apps/mobile`: React Native (Expo) para agricultores, compradores e transportadores.
-- `apps/web`: React + Vite para experiência web responsiva.
-- `apps/api`: Node.js + Express para API do MVP.
-- `packages/shared`: tipos e contratos compartilhados.
-- `docs`: arquitetura, fluxo de utilizador e esquema de dados.
+MVP inicial de um super app AgroTech que conecta camponeses, compradores, transportadores, estudantes e investidores.
 
-## Funcionalidades MVP cobertas
-- Dashboard agrícola (clima, alertas, trânsito/estradas, dica diária).
-- Feed inteligente com notícias, histórias e anúncios úteis.
-- Marketplace (produtos, insumos e serviços).
-- Logística/transporte com correspondência produtor ↔ transportador.
-- Perfil do camponês com reputação e histórico.
-- Modo estudante com micro-cursos e medalhas.
-- Offline-first (fila local + sincronização quando reconecta).
-- Notificações inteligentes orientadas a utilidade.
+## ✅ O que já está organizado
 
-## Arranque rápido (desenvolvimento)
+- Monorepo com apps separados para **mobile**, **web** e **api**.
+- Pacote **shared** para contratos e constantes comuns.
+- Documentação em `docs/` para arquitetura, fluxo e modelo de dados.
+- Base pronta para evolução em Angola → África → Mundo.
+
+## Estrutura de pastas
+
 ```bash
-# API
-cd apps/api && npm install && npm run dev
-
-# Web
-cd apps/web && npm install && npm run dev
-
-# Mobile (Expo)
-cd apps/mobile && npm install && npm run start
+.
+├── apps
+│   ├── api
+│   ├── mobile
+│   └── web
+├── docs
+└── packages
+    └── shared
 ```
+
+## Funcionalidades MVP incluídas
+
+1. Dashboard agrícola com clima, alertas e dica diária.
+2. Marketplace (produtos/insumos/serviços).
+3. Logística com preço sugerido e reputação.
+4. Perfil e reputação (base para evolução).
+5. Modo estudante com cursos rápidos e medalhas.
+6. Estrutura offline-first via endpoint de sincronização.
+
+## Como executar
+
+### 1) Instalar dependências do monorepo
+
+```bash
+npm install
+```
+
+### 2) Executar API
+
+```bash
+npm run dev:api
+```
+
+### 3) Executar Web
+
+```bash
+npm run dev:web
+```
+
+### 4) Executar Mobile (Expo)
+
+```bash
+npm run dev:mobile
+```
+
+## Próximos passos recomendados
+
+- Persistir dados em PostgreSQL/MongoDB.
+- Implementar autenticação por telefone/OTP.
+- Adicionar fila offline real no web/mobile (IndexedDB/SQLite).
+- Integrar notificações push inteligentes.
+- Criar testes unitários/integrados para API e Web.

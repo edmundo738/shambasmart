@@ -1,29 +1,19 @@
-# Arquitetura CHAMBA / ShambaSmart
+# Arquitetura do MVP CHAMBA / ShambaSmart
 
 ## Stack
-- **Mobile**: React Native + Expo + TypeScript.
-- **Web**: React + Vite + TypeScript (design minimalista e responsivo).
-- **Backend**: Node.js + Express + TypeScript.
-- **Dados**: PostgreSQL (produção) + Redis (fila/eventos e cache).
-- **Offline-first**: SQLite/AsyncStorage no mobile e IndexedDB no web para fila de ações.
+- **Mobile:** React Native (Expo)
+- **Web:** React + Vite
+- **API:** Node.js + Express
+- **Shared:** contratos e constantes reutilizáveis
 
-## Módulos de domínio
-1. **Identity & Profiles**
-2. **Dashboard & Alertas Inteligentes**
-3. **Marketplace**
-4. **Transporte & Logística**
-5. **Feed Inteligente**
-6. **Educação (Modo Estudante)**
-7. **Gamificação & Reputação**
-8. **Notificações**
+## Organização
+- `apps/mobile` → cliente mobile focado em usabilidade offline.
+- `apps/web` → painel web responsivo com os módulos principais do MVP.
+- `apps/api` → endpoints de dashboard, feed, marketplace, logística e cursos.
+- `packages/shared` → papéis de utilizador e tipos de ações offline.
 
-## Fluxo de dados simplificado
-1. Cliente carrega dados essenciais: clima, alertas, feed, preços.
-2. Ações críticas (interesse em anúncio, pedido de transporte, comentário) são guardadas localmente.
-3. Serviço de sincronização envia fila local quando a conexão volta.
-4. API confirma persistência e retorna estado atualizado.
-
-## Escalabilidade
-- Multi-tenant por país/região.
-- Particionamento por província para analytics.
-- CDN para mídia e conteúdo educativo.
+## Fluxo offline-first
+1. Utilizador interage no marketplace ou logística.
+2. Ação é guardada em fila local (cliente).
+3. Ao reconectar, cliente chama `POST /api/sync/offline-actions`.
+4. API confirma quantas ações foram sincronizadas.
