@@ -19,6 +19,20 @@ Monorepo base com:
 - Offline-first (fila local + sincronização quando reconecta).
 - Notificações inteligentes orientadas a utilidade.
 
+## Executável rápido
+Para iniciar a API com um único comando, use o executável na raiz do projeto:
+
+```bash
+./shambasmart
+```
+
+Opções:
+- `--dev`: inicia em modo desenvolvimento (`tsx watch`).
+- `--help`: mostra ajuda.
+
+> Antes do primeiro uso, instale as dependências da API:
+> `cd apps/api && npm install`
+
 ## Arranque rápido (desenvolvimento)
 ```bash
 # API
