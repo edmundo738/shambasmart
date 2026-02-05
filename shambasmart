@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+API_DIR="$ROOT_DIR/apps/api"
+
+usage() {
+  cat <<'USAGE'
+Uso:
+  ./shambasmart         Inicia a API em modo produção (build automático).
+  ./shambasmart --dev   Inicia a API em modo desenvolvimento (watch).
+  ./shambasmart --help  Mostra esta ajuda.
+USAGE
+}
+
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  usage
+  exit 0
+fi
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "Erro: Node.js não encontrado no PATH." >&2
+  exit 1
+fi
+
+if ! command -v npm >/dev/null 2>&1; then
+  echo "Erro: npm não encontrado no PATH." >&2
+  exit 1
+fi
+
+if [[ ! -d "$API_DIR/node_modules" ]]; then
+  echo "Dependências da API não encontradas. Execute:"
+  echo "  cd apps/api && npm install"
+  exit 1
+fi
+
+cd "$API_DIR"
+
+if [[ "${1:-}" == "--dev" ]]; then
+  exec npm run dev
+fi
+
+if [[ ! -f dist/server.js ]]; then
+  echo "Build não encontrado. A compilar API..."
+  npm run build
+fi
+
+exec node dist/server.js
