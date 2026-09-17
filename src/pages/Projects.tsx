@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  Clock, Copy, FolderOpen, Layers, Plus, Shapes, Sparkles, Trash2, User as UserIcon,
+  Clock, Copy, FlaskConical, FolderOpen, Layers, Plus, Shapes, Sparkles, Trash2, User as UserIcon,
 } from 'lucide-react';
 import { ProjectMeta, useProjects } from '../store/projects';
 import { useAuth } from '../store/auth';
@@ -133,6 +133,9 @@ export default function Projects() {
             <span className="font-display text-base font-bold text-white">PixelForge <span className="text-slate-500">Studio</span></span>
           </Link>
           <div className="flex-1" />
+          <Link to="/lab" className="flex items-center gap-1.5 rounded-lg border border-pixel-500/50 bg-pixel-500/10 px-3 py-2 text-xs font-bold text-pixel-400 hover:bg-pixel-500/20">
+            <FlaskConical size={14} /> Lab Procedural
+          </Link>
           {user ? (
             <span className="flex items-center gap-2 rounded-full border border-ink-600 bg-ink-900 px-3 py-1.5 text-xs font-semibold text-slate-200">
               <span className="flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-forge-500 to-pixel-500 text-[10px] font-bold text-ink-950">

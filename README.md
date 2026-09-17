@@ -13,6 +13,7 @@
 - **Prévia do jogo** — veja a animação na velocidade real, com fundo transparente/chroma e tira de frames
 - **Export de packs** — ZIP organizado com spritesheets PNG, metadados JSON por engine, GIFs e frames avulsos (`andar__gelo_f00.png`)
 - **Modelos prontos** — slime, cavaleiro, moeda e fantasma, todos animados e editáveis
+- **Laboratório Procedural** — algoritmo com seed que gera personagens (5 corpos, paletas, olhos, armas, acessórios) e anima 6 ações via rig de poses: idle, andar, correr, pular, ataque e dança
 - **SaaS completo** — landing page, contas, planos (Grátis/Pro/Studio) e dashboard de projetos com autosave
 
 ## 🚀 Como rodar
@@ -29,6 +30,7 @@ npm run build   # build de produção (tsc + vite)
 |------|--------|
 | `/` | Landing page do SaaS |
 | `/projetos` | Dashboard: criar, templates, projetos salvos, planos |
+| `/lab` | Laboratório Procedural: gere personagens + movimentos e envie ao Studio |
 | `/studio` | Editor (cria via `?template=slime` ou `?name=...&w=32&h=32`) |
 | `/studio/:projectId` | Editor de um projeto salvo |
 

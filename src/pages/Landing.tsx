@@ -62,6 +62,7 @@ export default function Landing() {
             <a href="#recursos" className="hover:text-white">Recursos</a>
             <a href="#como-funciona" className="hover:text-white">Como funciona</a>
             <a href="#vitrine" className="hover:text-white">Vitrine</a>
+            <Link to="/lab" className="text-pixel-400 hover:text-pixel-500">Lab Procedural</Link>
             <a href="#planos" className="hover:text-white">Planos</a>
           </nav>
           <div className="flex-1" />

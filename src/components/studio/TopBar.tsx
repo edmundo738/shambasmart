@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Check, Cloud, Download, Redo2, Undo2, User as UserIcon } from 'lucide-react';
+import { ArrowLeft, Check, Cloud, Download, FlaskConical, Redo2, Undo2, User as UserIcon } from 'lucide-react';
 import { useStudio } from '../../store/studio';
 import { useAuth } from '../../store/auth';
 import AuthModal from '../AuthModal';
@@ -73,6 +73,10 @@ export default function TopBar({ onExport }: { onExport: () => void }) {
       <button onClick={redo} disabled={!canRedo} title="Refazer (Ctrl+Y)" className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-ink-800 hover:text-white disabled:opacity-30">
         <Redo2 size={17} />
       </button>
+
+      <Link to="/lab" title="Laboratório Procedural — gerar personagens e movimentos" className="flex h-9 w-9 items-center justify-center rounded-lg text-pixel-400 hover:bg-ink-800">
+        <FlaskConical size={17} />
+      </Link>
 
       {user ? (
         <span className="hidden items-center gap-1.5 rounded-full border border-ink-600 bg-ink-800 px-3 py-1.5 text-xs font-semibold text-slate-200 md:flex" title={user.email}>
