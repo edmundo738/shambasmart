@@ -1,4 +1,5 @@
-import { Animation, Frame, uid } from '../types';
+import { Animation, Frame, Layer, uid } from '../types';
+import { createLayer } from './layers';
 import { emptyCells } from './pixels';
 
 /**
@@ -27,8 +28,8 @@ class Painter {
       }
     }
   }
-  frame(): Frame {
-    return { id: uid('fr'), cells: [...this.cells] };
+  frame(layerId: string): Frame {
+    return { id: uid('fr'), cels: { [layerId]: [...this.cells] } };
   }
   clear() {
     this.cells = emptyCells(W, H);
@@ -48,6 +49,7 @@ function collect(frames: Frame[]): Record<string, Frame> {
 export interface TemplateBuild {
   animations: Animation[];
   frames: Record<string, Frame>;
+  layers: Layer[];
   palette: string[];
 }
 
@@ -110,6 +112,7 @@ function drawSlime(p: Painter, opts: { squash: number; dy: number; blink: boolea
 
 function buildSlime(): TemplateBuild {
   const p = new Painter();
+  const layer = createLayer('Camada 1');
   const all: Frame[] = [];
 
   const idleCfg = [
@@ -118,7 +121,7 @@ function buildSlime(): TemplateBuild {
     { squash: 0, dy: 0, blink: false },
     { squash: 1.4, dy: 1, blink: true },
   ];
-  const idleFrames = idleCfg.map((c) => { p.clear(); drawSlime(p, c); const f = p.frame(); all.push(f); return f; });
+  const idleFrames = idleCfg.map((c) => { p.clear(); drawSlime(p, c); const f = p.frame(layer.id); all.push(f); return f; });
 
   const hopCfg = [
     { squash: 1.6, dy: 1, blink: false },
@@ -126,7 +129,7 @@ function buildSlime(): TemplateBuild {
     { squash: -0.6, dy: -6, blink: false },
     { squash: 0.6, dy: -1, blink: false },
   ];
-  const hopFrames = hopCfg.map((c) => { p.clear(); drawSlime(p, c); const f = p.frame(); all.push(f); return f; });
+  const hopFrames = hopCfg.map((c) => { p.clear(); drawSlime(p, c); const f = p.frame(layer.id); all.push(f); return f; });
 
   // dash attack: estica para a direita com linhas de velocidade
   const dashDx = [-2, 4, 1];
@@ -138,7 +141,7 @@ function buildSlime(): TemplateBuild {
       p.rect(1, 20, 7, 1, '#9be8ff');
       p.rect(3, 24, 5, 1, '#9be8ff');
     }
-    const f = p.frame(); all.push(f); return f;
+    const f = p.frame(layer.id); all.push(f); return f;
   });
 
   return {
@@ -148,6 +151,7 @@ function buildSlime(): TemplateBuild {
       makeAnim('dash', 10, dashFrames),
     ],
     frames: collect(all),
+    layers: [layer],
     palette: [SLIME.body, SLIME.bodyDark, SLIME.outline, SLIME.light, '#ffffff', '#10131d', SLIME.blush, '#9be8ff'],
   };
 }
@@ -254,13 +258,14 @@ function drawKnight(p: Painter, opts: { dy: number; legs: LegPose; sword: SwordP
 
 function buildKnight(): TemplateBuild {
   const p = new Painter();
+  const layer = createLayer('Camada 1');
   const all: Frame[] = [];
 
   const idleCfg: Array<{ dy: number; legs: LegPose; sword: SwordPose }> = [
     { dy: 0, legs: 'neutro', sword: 'idle' },
     { dy: -1, legs: 'neutro', sword: 'idle' },
   ];
-  const idle = idleCfg.map((c) => { p.clear(); drawKnight(p, c); const f = p.frame(); all.push(f); return f; });
+  const idle = idleCfg.map((c) => { p.clear(); drawKnight(p, c); const f = p.frame(layer.id); all.push(f); return f; });
 
   const walkCfg: Array<{ dy: number; legs: LegPose; sword: SwordPose }> = [
     { dy: 0, legs: 'neutro', sword: 'idle' },
@@ -268,14 +273,14 @@ function buildKnight(): TemplateBuild {
     { dy: 0, legs: 'neutro', sword: 'idle' },
     { dy: -1, legs: 'passoB', sword: 'idle' },
   ];
-  const walk = walkCfg.map((c) => { p.clear(); drawKnight(p, c); const f = p.frame(); all.push(f); return f; });
+  const walk = walkCfg.map((c) => { p.clear(); drawKnight(p, c); const f = p.frame(layer.id); all.push(f); return f; });
 
   const atkCfg: Array<{ dy: number; legs: LegPose; sword: SwordPose }> = [
     { dy: 0, legs: 'neutro', sword: 'erguer' },
     { dy: 1, legs: 'passoA', sword: 'golpe' },
     { dy: 0, legs: 'neutro', sword: 'idle' },
   ];
-  const atk = atkCfg.map((c) => { p.clear(); drawKnight(p, c); const f = p.frame(); all.push(f); return f; });
+  const atk = atkCfg.map((c) => { p.clear(); drawKnight(p, c); const f = p.frame(layer.id); all.push(f); return f; });
 
   return {
     animations: [
@@ -284,6 +289,7 @@ function buildKnight(): TemplateBuild {
       makeAnim('ataque', 10, atk),
     ],
     frames: collect(all),
+    layers: [layer],
     palette: [KN.steel, KN.steelDark, KN.plume, KN.skin, KN.tunic, KN.tunicDark, KN.boots, KN.blade, KN.gold, KN.outline],
   };
 }
@@ -318,18 +324,20 @@ function drawCoin(p: Painter, rx: number, dy = 0, sparkles = false) {
 
 function buildCoin(): TemplateBuild {
   const p = new Painter();
+  const layer = createLayer('Camada 1');
   const all: Frame[] = [];
   const spinRx = [9, 6, 2, 6];
-  const spin = spinRx.map((rx) => { p.clear(); drawCoin(p, rx); const f = p.frame(); all.push(f); return f; });
+  const spin = spinRx.map((rx) => { p.clear(); drawCoin(p, rx); const f = p.frame(layer.id); all.push(f); return f; });
   const collectCfg = [
     { rx: 9, dy: 0, sp: false },
     { rx: 9, dy: -4, sp: true },
     { rx: 6, dy: -8, sp: true },
   ];
-  const collectA = collectCfg.map((c) => { p.clear(); drawCoin(p, c.rx, c.dy, c.sp); const f = p.frame(); all.push(f); return f; });
+  const collectA = collectCfg.map((c) => { p.clear(); drawCoin(p, c.rx, c.dy, c.sp); const f = p.frame(layer.id); all.push(f); return f; });
   return {
     animations: [makeAnim('girar', 10, spin), makeAnim('coletar', 8, collectA)],
     frames: collect(all),
+    layers: [layer],
     palette: [COIN.gold, COIN.goldDark, COIN.goldLight, '#ffffff'],
   };
 }
@@ -381,6 +389,7 @@ function drawGhost(p: Painter, dy: number, blink: boolean, mouthOpen: boolean) {
 
 function buildGhost(): TemplateBuild {
   const p = new Painter();
+  const layer = createLayer('Camada 1');
   const all: Frame[] = [];
   const floatCfg = [
     { dy: 0, blink: false, mouth: false },
@@ -390,7 +399,7 @@ function buildGhost(): TemplateBuild {
   ];
   const float = floatCfg.map((c) => {
     p.clear(); drawGhost(p, c.dy, c.blink, c.mouth);
-    const f = p.frame(); all.push(f); return f;
+    const f = p.frame(layer.id); all.push(f); return f;
   });
   const scareCfg = [
     { dy: 0, blink: false, mouth: false },
@@ -399,11 +408,12 @@ function buildGhost(): TemplateBuild {
   ];
   const scare = scareCfg.map((c) => {
     p.clear(); drawGhost(p, c.dy, c.blink, c.mouth);
-    const f = p.frame(); all.push(f); return f;
+    const f = p.frame(layer.id); all.push(f); return f;
   });
   return {
     animations: [makeAnim('flutuar', 6, float), makeAnim('assustar', 8, scare)],
     frames: collect(all),
+    layers: [layer],
     palette: [GH.body, GH.shade, GH.outline, '#ffffff', GH.eye, GH.blush],
   };
 }

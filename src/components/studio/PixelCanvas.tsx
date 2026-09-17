@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useStudio } from '../../store/studio';
 import {
-  brushIndices, ellipsePoints, floodFill, idx, inBounds, linePoints, mirrorPoints,
+  brushIndices, ellipsePoints, emptyCells, floodFill, idx, inBounds, linePoints, mirrorPoints,
   pixelPerfectStep, rectPoints,
 } from '../../lib/pixels';
+import { compositeStack, flattenCells } from '../../lib/layers';
 
 export default function PixelCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -42,12 +43,13 @@ export default function PixelCanvas() {
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // onion skin (frame anterior em vermelho fantasma)
+    // onion skin (frame anterior mesclado, em vermelho fantasma)
     if (onionSkin && prevFrame && prevFrame.id !== frame.id) {
+      const prev = flattenCells(project, prevFrame);
       ctx.globalAlpha = 0.32;
       for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
-          if (prevFrame.cells[y * w + x]) {
+          if (prev[y * w + x]) {
             ctx.fillStyle = '#ff4d6d';
             ctx.fillRect(x * zoom, y * zoom, zoom, zoom);
           }
@@ -56,15 +58,20 @@ export default function PixelCanvas() {
       ctx.globalAlpha = 1;
     }
 
-    // pixels do frame
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        const c = frame.cells[y * w + x];
-        if (!c) continue;
-        ctx.fillStyle = c;
-        ctx.fillRect(x * zoom, y * zoom, zoom, zoom);
+    // pixels do frame, camada por camada (com opacidade)
+    for (const { layer, cells } of compositeStack(project, frame)) {
+      if (layer.opacity <= 0) continue;
+      ctx.globalAlpha = Math.max(0, Math.min(1, layer.opacity / 100));
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const c = cells[y * w + x];
+          if (!c) continue;
+          ctx.fillStyle = c;
+          ctx.fillRect(x * zoom, y * zoom, zoom, zoom);
+        }
       }
     }
+    ctx.globalAlpha = 1;
 
     // grade
     if (showGrid && zoom >= 6) {
@@ -187,17 +194,20 @@ export default function PixelCanvas() {
     const st = useStudio.getState();
     const [x, y] = cell;
 
-    // conta-gotas: ferramenta própria ou Alt pressionado
+    // conta-gotas: ferramenta própria ou Alt pressionado (lê o composto)
     if (st.tool === 'picker' || e.altKey) {
-      const c = frame.cells[idx(x, y, project.width)];
+      const c = flattenCells(project, frame)[idx(x, y, project.width)];
       if (c) st.setColor(c);
       return;
     }
 
     const erase = e.button === 2 || st.tool === 'eraser';
+    const layer = project.layers.find((l) => l.id === st.currentLayerId) ?? project.layers[project.layers.length - 1];
+    if (layer?.locked) return; // camada travada: sem pintura
+    const cel = frame.cels[layer.id] ?? emptyCells(project.width, project.height);
 
     if (st.tool === 'fill') {
-      const changed = floodFill(frame.cells, project.width, project.height, x, y, erase ? '' : st.color);
+      const changed = floodFill(cel, project.width, project.height, x, y, erase ? '' : st.color);
       // só empilha undo se algo realmente mudou
       if (changed.length) {
         st.beginStroke();
@@ -214,7 +224,7 @@ export default function PixelCanvas() {
 
     st.beginStroke();
     // snapshot grátis: paint() é imutável, então a referência congela o pré-traço
-    drag.current = { drawing: true, startX: x, startY: y, erase, lastX: x, lastY: y, lastKey: '', trail: [], orig: frame.cells };
+    drag.current = { drawing: true, startX: x, startY: y, erase, lastX: x, lastY: y, lastKey: '', trail: [], orig: cel };
     applyStrokeTo(x, y, erase);
   };
 

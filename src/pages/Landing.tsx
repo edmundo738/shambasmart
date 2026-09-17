@@ -5,6 +5,7 @@ import {
   Shapes, Sparkles, User as UserIcon, Wand2, Zap,
 } from 'lucide-react';
 import { TEMPLATES, TemplateBuild } from '../lib/templates';
+import { frameItem } from '../lib/layers';
 import { Variation } from '../types';
 import { AnimatedSprite } from '../components/SpriteView';
 import AuthModal from '../components/AuthModal';
@@ -40,17 +41,16 @@ export default function Landing() {
   const coin = useMemo(() => TEMPLATES[2].build(), []);
   const ghost = useMemo(() => TEMPLATES[3].build(), []);
 
-  const framesOf = (built: ReturnType<typeof slime extends never ? never : () => typeof slime>, animName: string) => {
-    const b = built as unknown as { animations: { name: string; fps: number; frameIds: string[] }[]; frames: Record<string, { id: string; cells: string[] }> };
-    const a = b.animations.find((x) => x.name === animName) ?? b.animations[0];
-    return { frames: a.frameIds.map((fid) => b.frames[fid]), fps: a.fps, name: a.name };
+  const framesOf = (built: TemplateBuild, animName: string) => {
+    const a = built.animations.find((x) => x.name === animName) ?? built.animations[0];
+    return { frames: a.frameIds.map((fid) => frameItem(built.layers, built.frames[fid])), fps: a.fps, name: a.name };
   };
 
-  const slimeIdle = framesOf(slime as never, 'idle');
-  const knightWalk = framesOf(knight as never, 'andar');
-  const knightAtk = framesOf(knight as never, 'ataque');
-  const coinSpin = framesOf(coin as never, 'girar');
-  const ghostFloat = framesOf(ghost as never, 'flutuar');
+  const slimeIdle = framesOf(slime, 'idle');
+  const knightWalk = framesOf(knight, 'andar');
+  const knightAtk = framesOf(knight, 'ataque');
+  const coinSpin = framesOf(coin, 'girar');
+  const ghostFloat = framesOf(ghost, 'flutuar');
 
   return (
     <div className="min-h-full bg-ink-950">
@@ -244,7 +244,7 @@ export default function Landing() {
                 {SHOWCASE_VARS.map((v) => (
                   <div key={`${a.name}-${v.name}`} className="checker flex items-center justify-center rounded-lg border border-ink-700 py-3 transition-colors hover:border-forge-500">
                     <AnimatedSprite
-                      frames={a.frameIds.map((fid) => knight.frames[fid])}
+                      frames={a.frameIds.map((fid) => frameItem(knight.layers, knight.frames[fid]))}
                       width={32} height={32} fps={a.fps} scale={3} variation={v.v}
                     />
                   </div>

@@ -1,20 +1,23 @@
 import { create } from 'zustand';
 import {
-  Animation, Frame, ORIGINAL_VARIATION_ID, ProjectData, ToolId, Variation, uid,
+  Animation, Frame, Layer, ORIGINAL_VARIATION_ID, ProjectData, ToolId, Variation, uid,
 } from '../types';
 import { emptyCells } from '../lib/pixels';
+import { createLayer, makeFrame, migrateProject } from '../lib/layers';
 import { normalizeHex } from '../lib/color';
 import { TEMPLATES } from '../lib/templates';
 
 interface HistorySnap {
   frames: Record<string, Frame>;
   animations: Animation[];
+  layers: Layer[];
 }
 
 function snap(project: ProjectData): HistorySnap {
   return {
     frames: JSON.parse(JSON.stringify(project.frames)),
     animations: JSON.parse(JSON.stringify(project.animations)),
+    layers: JSON.parse(JSON.stringify(project.layers)),
   };
 }
 
@@ -23,6 +26,9 @@ function restoreFrames(s: HistorySnap): Record<string, Frame> {
 }
 function restoreAnims(s: HistorySnap): Animation[] {
   return JSON.parse(JSON.stringify(s.animations));
+}
+function restoreLayers(s: HistorySnap): Layer[] {
+  return JSON.parse(JSON.stringify(s.layers));
 }
 
 interface StudioState {
@@ -39,6 +45,7 @@ interface StudioState {
   playing: boolean;
   currentAnimationId: string | null;
   currentFrameId: string | null;
+  currentLayerId: string | null;
   variationId: string;
   past: HistorySnap[];
   future: HistorySnap[];
@@ -64,6 +71,16 @@ interface StudioState {
   setPlaying: (b: boolean) => void;
   select: (animId: string | null, frameId?: string | null) => void;
   setVariation: (id: string) => void;
+
+  // camadas
+  selectLayer: (id: string) => void;
+  addLayer: (name?: string) => void;
+  renameLayer: (id: string, name: string) => void;
+  deleteLayer: (id: string) => void;
+  moveLayer: (id: string, dir: -1 | 1) => void;
+  toggleLayerVis: (id: string) => void;
+  toggleLayerLock: (id: string) => void;
+  setLayerOpacity: (id: string, opacity: number) => void;
 
   // pintura
   beginStroke: () => void;
@@ -116,6 +133,26 @@ function currentAnim(project: ProjectData, animId: string | null): Animation | u
   return project.animations.find((a) => a.id === animId) ?? project.animations[0];
 }
 
+function currentLayer(project: ProjectData, layerId: string | null): Layer {
+  return project.layers.find((l) => l.id === layerId)
+    ?? project.layers[project.layers.length - 1]
+    ?? createLayer('Camada 1');
+}
+
+function emptyCels(project: ProjectData): Record<string, string[]> {
+  const cels: Record<string, string[]> = {};
+  for (const l of project.layers) cels[l.id] = emptyCells(project.width, project.height);
+  return cels;
+}
+
+function cloneCels(frame: Frame | undefined, project: ProjectData): Record<string, string[]> {
+  const cels: Record<string, string[]> = {};
+  for (const l of project.layers) {
+    cels[l.id] = frame?.cels[l.id] ? [...frame.cels[l.id]] : emptyCells(project.width, project.height);
+  }
+  return cels;
+}
+
 export const useStudio = create<StudioState>((set, get) => ({
   project: null,
   tool: 'brush',
@@ -130,28 +167,35 @@ export const useStudio = create<StudioState>((set, get) => ({
   playing: true,
   currentAnimationId: null,
   currentFrameId: null,
+  currentLayerId: null,
   variationId: ORIGINAL_VARIATION_ID,
   past: [],
   future: [],
   dirty: false,
 
-  loadProject: (p) => set({
-    project: p,
-    currentAnimationId: p.animations[0]?.id ?? null,
-    currentFrameId: p.animations[0]?.frameIds[0] ?? null,
+  loadProject: (p) => {
+    const project = migrateProject(p);
+    return set({
+    project,
+    currentAnimationId: project.animations[0]?.id ?? null,
+    currentFrameId: project.animations[0]?.frameIds[0] ?? null,
+    currentLayerId: project.layers[project.layers.length - 1]?.id ?? null,
     variationId: ORIGINAL_VARIATION_ID,
     past: [],
     future: [],
     dirty: false,
     playing: true,
-  }),
+    });
+  },
 
   newEmptyProject: (name, w, h) => {
-    const frame: Frame = { id: uid('fr'), cells: emptyCells(w, h) };
+    const layer = createLayer('Camada 1');
+    const frame: Frame = makeFrame(layer.id, emptyCells(w, h));
     const anim: Animation = { id: uid('an'), name: 'idle', fps: 8, frameIds: [frame.id] };
     const now = Date.now();
     const project: ProjectData = {
       id: uid('pj'), name, width: w, height: h,
+      layers: [layer],
       frames: { [frame.id]: frame },
       animations: [anim],
       variations: [],
@@ -167,6 +211,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     const now = Date.now();
     const project: ProjectData = {
       id: uid('pj'), name: name || tpl.name, width: 32, height: 32,
+      layers: built.layers,
       frames: built.frames,
       animations: built.animations,
       variations: [],
@@ -202,19 +247,121 @@ export const useStudio = create<StudioState>((set, get) => ({
   }),
   setVariation: (variationId) => set({ variationId }),
 
+  selectLayer: (id) => set((s) => {
+    if (!s.project || !s.project.layers.some((l) => l.id === id)) return {};
+    return { currentLayerId: id };
+  }),
+
+  addLayer: (name) => set((s) => {
+    if (!s.project) return {};
+    const hist = pushHistory(s);
+    const layer = createLayer(name || `Camada ${s.project.layers.length + 1}`);
+    const frames: Record<string, Frame> = {};
+    for (const [fid, f] of Object.entries(s.project.frames)) {
+      frames[fid] = { ...f, cels: { ...f.cels, [layer.id]: emptyCells(s.project!.width, s.project!.height) } };
+    }
+    return {
+      ...hist,
+      project: { ...s.project, layers: [...s.project.layers, layer], frames, updatedAt: Date.now() },
+      currentLayerId: layer.id,
+    };
+  }),
+
+  renameLayer: (id, name) => set((s) => {
+    if (!s.project || !name.trim()) return {};
+    if (!s.project.layers.some((l) => l.id === id)) return {};
+    const hist = pushHistory(s);
+    return {
+      ...hist,
+      project: {
+        ...s.project,
+        layers: s.project.layers.map((l) => (l.id === id ? { ...l, name: name.trim().slice(0, 24) } : l)),
+        updatedAt: Date.now(),
+      },
+    };
+  }),
+
+  deleteLayer: (id) => set((s) => {
+    if (!s.project || s.project.layers.length <= 1) return {};
+    if (!s.project.layers.some((l) => l.id === id)) return {};
+    const hist = pushHistory(s);
+    const layers = s.project.layers.filter((l) => l.id !== id);
+    const frames: Record<string, Frame> = {};
+    for (const [fid, f] of Object.entries(s.project.frames)) {
+      const cels = { ...f.cels };
+      delete cels[id];
+      frames[fid] = { ...f, cels };
+    }
+    return {
+      ...hist,
+      project: { ...s.project, layers, frames, updatedAt: Date.now() },
+      currentLayerId: s.currentLayerId === id ? layers[layers.length - 1].id : s.currentLayerId,
+    };
+  }),
+
+  moveLayer: (id, dir) => set((s) => {
+    if (!s.project) return {};
+    const i = s.project.layers.findIndex((l) => l.id === id);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= s.project.layers.length) return {};
+    const hist = pushHistory(s);
+    const layers = [...s.project.layers];
+    [layers[i], layers[j]] = [layers[j], layers[i]];
+    return { ...hist, project: { ...s.project, layers, updatedAt: Date.now() } };
+  }),
+
+  // visibilidade, lock e opacidade são estado de vista (como grade/onion): sem undo
+  toggleLayerVis: (id) => set((s) => {
+    if (!s.project) return {};
+    return {
+      project: {
+        ...s.project,
+        layers: s.project.layers.map((l) => (l.id === id ? { ...l, visible: !l.visible } : l)),
+        updatedAt: Date.now(),
+      },
+      dirty: true,
+    };
+  }),
+
+  toggleLayerLock: (id) => set((s) => {
+    if (!s.project) return {};
+    return {
+      project: {
+        ...s.project,
+        layers: s.project.layers.map((l) => (l.id === id ? { ...l, locked: !l.locked } : l)),
+        updatedAt: Date.now(),
+      },
+      dirty: true,
+    };
+  }),
+
+  setLayerOpacity: (id, opacity) => set((s) => {
+    if (!s.project) return {};
+    return {
+      project: {
+        ...s.project,
+        layers: s.project.layers.map((l) => (l.id === id ? { ...l, opacity: Math.max(0, Math.min(100, Math.round(opacity))) } : l)),
+        updatedAt: Date.now(),
+      },
+      dirty: true,
+    };
+  }),
+
   beginStroke: () => set((s) => pushHistory(s)),
 
   paint: (indices, color) => set((s) => {
     if (!s.project || !s.currentFrameId) return {};
+    const layer = currentLayer(s.project, s.currentLayerId);
+    if (layer.locked) return {};
     const frame = s.project.frames[s.currentFrameId];
     if (!frame) return {};
-    const cells = [...frame.cells];
+    const cells = [...(frame.cels[layer.id] ?? emptyCells(s.project.width, s.project.height))];
     const value = color === null ? '' : normalizeHex(color);
     for (const i of indices) cells[i] = value;
     return {
       project: {
         ...s.project,
-        frames: { ...s.project.frames, [frame.id]: { ...frame, cells } },
+        frames: { ...s.project.frames, [frame.id]: { ...frame, cels: { ...frame.cels, [layer.id]: cells } } },
         updatedAt: Date.now(),
       },
       dirty: true,
@@ -223,14 +370,16 @@ export const useStudio = create<StudioState>((set, get) => ({
 
   paintPatch: (patches) => set((s) => {
     if (!s.project || !s.currentFrameId || !patches.length) return {};
+    const layer = currentLayer(s.project, s.currentLayerId);
+    if (layer.locked) return {};
     const frame = s.project.frames[s.currentFrameId];
     if (!frame) return {};
-    const cells = [...frame.cells];
+    const cells = [...(frame.cels[layer.id] ?? emptyCells(s.project.width, s.project.height))];
     for (const [i, c] of patches) cells[i] = c ? normalizeHex(c) : '';
     return {
       project: {
         ...s.project,
-        frames: { ...s.project.frames, [frame.id]: { ...frame, cells } },
+        frames: { ...s.project.frames, [frame.id]: { ...frame, cels: { ...frame.cels, [layer.id]: cells } } },
         updatedAt: Date.now(),
       },
       dirty: true,
@@ -249,7 +398,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     const anim = currentAnim(s.project, s.currentAnimationId);
     if (!anim) return {};
     const hist = pushHistory(s);
-    const frame: Frame = { id: uid('fr'), cells: emptyCells(s.project.width, s.project.height) };
+    const frame: Frame = { id: uid('fr'), cels: emptyCels(s.project) };
     const curIdx = s.currentFrameId ? anim.frameIds.indexOf(s.currentFrameId) : anim.frameIds.length - 1;
     const frameIds = [...anim.frameIds];
     frameIds.splice(curIdx + 1, 0, frame.id);
@@ -272,7 +421,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     const src = s.project.frames[id];
     if (!anim || !src || !anim.frameIds.includes(id)) return {};
     const hist = pushHistory(s);
-    const frame: Frame = { id: uid('fr'), cells: [...src.cells] };
+    const frame: Frame = { id: uid('fr'), cels: cloneCels(src, s.project) };
     const frameIds = [...anim.frameIds];
     frameIds.splice(frameIds.indexOf(id) + 1, 0, frame.id);
     const animations = s.project.animations.map((a) => (a.id === anim.id ? { ...a, frameIds } : a));
@@ -318,13 +467,16 @@ export const useStudio = create<StudioState>((set, get) => ({
 
   clearFrame: (id) => set((s) => {
     if (!s.project || !s.project.frames[id]) return {};
+    const layer = currentLayer(s.project, s.currentLayerId);
+    if (layer.locked) return {};
     const hist = pushHistory(s);
     const frame = s.project.frames[id];
+    const cels = { ...frame.cels, [layer.id]: emptyCells(s.project.width, s.project.height) };
     return {
       ...hist,
       project: {
         ...s.project,
-        frames: { ...s.project.frames, [id]: { ...frame, cells: emptyCells(s.project.width, s.project.height) } },
+        frames: { ...s.project.frames, [id]: { ...frame, cels } },
         updatedAt: Date.now(),
       },
     };
@@ -333,7 +485,7 @@ export const useStudio = create<StudioState>((set, get) => ({
   addAnimation: (name) => set((s) => {
     if (!s.project) return {};
     const hist = pushHistory(s);
-    const frame: Frame = { id: uid('fr'), cells: emptyCells(s.project.width, s.project.height) };
+    const frame: Frame = { id: uid('fr'), cels: emptyCels(s.project) };
     const count = s.project.animations.length + 1;
     const anim: Animation = { id: uid('an'), name: name || `acao_${count}`, fps: 8, frameIds: [frame.id] };
     return {
@@ -385,7 +537,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     const frames = { ...s.project.frames };
     const frameIds = src.frameIds.map((fid) => {
       const f = frames[fid];
-      const copy: Frame = { id: uid('fr'), cells: f ? [...f.cells] : emptyCells(s.project!.width, s.project!.height) };
+      const copy: Frame = { id: uid('fr'), cels: cloneCels(f, s.project!) };
       frames[copy.id] = copy;
       return copy.id;
     });
@@ -402,8 +554,13 @@ export const useStudio = create<StudioState>((set, get) => ({
     if (!s.project || !framesCells.length) return {};
     const hist = pushHistory(s);
     const frames = { ...s.project.frames };
+    const target = s.project.layers.find((l) => l.id === s.currentLayerId && !l.locked)
+      ?? s.project.layers.find((l) => !l.locked)
+      ?? s.project.layers[0];
     const frameIds = framesCells.map((cells) => {
-      const f: Frame = { id: uid('fr'), cells: [...cells] };
+      const cels = emptyCels(s.project!);
+      if (target) cels[target.id] = [...cells];
+      const f: Frame = { id: uid('fr'), cels };
       frames[f.id] = f;
       return f.id;
     });
@@ -525,6 +682,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     const future = [snap(s.project), ...s.future].slice(0, HISTORY_LIMIT);
     const frames = restoreFrames(prev);
     const animations = restoreAnims(prev);
+    const layers = restoreLayers(prev);
     // revalida seleção
     let { currentAnimationId, currentFrameId } = s;
     if (!animations.some((a) => a.id === currentAnimationId)) {
@@ -536,10 +694,14 @@ export const useStudio = create<StudioState>((set, get) => ({
         currentFrameId = anim.frameIds[0] ?? null;
       }
     }
+    let currentLayerId = s.currentLayerId;
+    if (!layers.some((l) => l.id === currentLayerId)) {
+      currentLayerId = layers[layers.length - 1]?.id ?? null;
+    }
     return {
       past, future,
-      project: { ...s.project, frames, animations, updatedAt: Date.now() },
-      currentAnimationId, currentFrameId, dirty: true,
+      project: { ...s.project, frames, animations, layers, updatedAt: Date.now() },
+      currentAnimationId, currentFrameId, currentLayerId, dirty: true,
     };
   }),
 
@@ -549,6 +711,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     const past = [...s.past, snap(s.project)].slice(-HISTORY_LIMIT);
     const frames = restoreFrames(next);
     const animations = restoreAnims(next);
+    const layers = restoreLayers(next);
     let { currentAnimationId, currentFrameId } = s;
     if (!animations.some((a) => a.id === currentAnimationId)) {
       currentAnimationId = animations[0]?.id ?? null;
@@ -559,10 +722,14 @@ export const useStudio = create<StudioState>((set, get) => ({
         currentFrameId = anim.frameIds[0] ?? null;
       }
     }
+    let currentLayerId = s.currentLayerId;
+    if (!layers.some((l) => l.id === currentLayerId)) {
+      currentLayerId = layers[layers.length - 1]?.id ?? null;
+    }
     return {
       past, future,
-      project: { ...s.project, frames, animations, updatedAt: Date.now() },
-      currentAnimationId, currentFrameId, dirty: true,
+      project: { ...s.project, frames, animations, layers, updatedAt: Date.now() },
+      currentAnimationId, currentFrameId, currentLayerId, dirty: true,
     };
   }),
 }));

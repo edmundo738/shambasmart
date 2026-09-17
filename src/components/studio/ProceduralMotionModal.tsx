@@ -3,7 +3,7 @@ import { Clapperboard, Wand2, X } from 'lucide-react';
 import { useStudio } from '../../store/studio';
 import { RETARGET_DEFS, RetargetId, generateRetargetFrames } from '../../lib/procgen/retarget';
 import { AnimatedSprite, SpriteCanvas } from '../SpriteView';
-import { Frame } from '../../types';
+import { celStack, flattenCells } from '../../lib/layers';
 
 export default function ProceduralMotionModal({ onClose }: { onClose: () => void }) {
   const project = useStudio((s) => s.project);
@@ -19,9 +19,9 @@ export default function ProceduralMotionModal({ onClose }: { onClose: () => void
 
   const source = project && currentFrameId ? project.frames[currentFrameId] : undefined;
 
-  const preview: Frame[] = useMemo(() => {
+  const preview = useMemo(() => {
     if (!project || !source) return [];
-    const cells = generateRetargetFrames(source.cells, project.width, project.height, def, frames, intensity);
+    const cells = generateRetargetFrames(flattenCells(project, source), project.width, project.height, def, frames, intensity);
     return cells.map((c, i) => ({ id: `ret_${i}`, cells: c }));
   }, [project, source, def, frames, intensity]);
 
@@ -72,7 +72,7 @@ export default function ProceduralMotionModal({ onClose }: { onClose: () => void
               </div>
               <div className="flex items-center gap-2 border-t border-ink-700 bg-ink-950 px-3 py-2">
                 <span className="text-[11px] text-slate-500">fonte:</span>
-                <SpriteCanvas cells={source.cells} width={project.width} height={project.height} scale={1} className="h-8 w-8 rounded border border-ink-700 object-contain" />
+                <SpriteCanvas layers={celStack(project.layers, source)} width={project.width} height={project.height} scale={1} className="h-8 w-8 rounded border border-ink-700 object-contain" />
                 <span className="ml-auto font-mono text-[11px] text-slate-400">{def.fps}fps · {frames}f</span>
               </div>
             </div>

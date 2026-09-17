@@ -7,10 +7,11 @@ import { BODY_TYPES, BodyType, MOODS, MoodId } from '../lib/procgen/bodies';
 import { ACTION_DEFS, generateActionFrames, generateCharacter, poseSingle } from '../lib/procgen/generator';
 import { ActionId, MotionParams } from '../lib/procgen/motions';
 import { randomSeed } from '../lib/procgen/rng';
-import { AnimatedSprite, SpriteCanvas } from '../components/SpriteView';
+import { AnimatedSprite, SpriteCanvas, SpriteFrameItem } from '../components/SpriteView';
 import { useStudio } from '../store/studio';
 import { useProjects } from '../store/projects';
 import { Animation, Frame, ProjectData, uid } from '../types';
+import { createLayer, makeFrame } from '../lib/layers';
 
 function Slider({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
   return (
@@ -52,13 +53,13 @@ export default function Lab() {
     [seed, body, mood, size, outline],
   );
 
-  const stageFrames: Frame[] = useMemo(() => {
+  const stageFrames: SpriteFrameItem[] = useMemo(() => {
     const cells = generateActionFrames(spec, selectedAction, actions[selectedAction].frames, params);
     return cells.map((c, i) => ({ id: `stage_${i}`, cells: c }));
   }, [spec, selectedAction, actions, params]);
 
   const tabFrames = useMemo(() => {
-    const out = {} as Record<ActionId, Frame[]>;
+    const out = {} as Record<ActionId, SpriteFrameItem[]>;
     for (const d of ACTION_DEFS) {
       const cells = generateActionFrames(spec, d.id, Math.min(4, actions[d.id].frames), params);
       out[d.id] = cells.map((c, i) => ({ id: `tab_${d.id}_${i}`, cells: c }));
@@ -77,11 +78,12 @@ export default function Lab() {
   const enabledActions = ACTION_DEFS.filter((d) => actions[d.id].on);
 
   const buildProjectData = (): ProjectData => {
+    const layer = createLayer('Camada 1');
     const frames: Record<string, Frame> = {};
     const anims: Animation[] = enabledActions.map((def) => {
       const cells = generateActionFrames(spec, def.id, actions[def.id].frames, params);
       const frameIds = cells.map((c) => {
-        const f: Frame = { id: uid('fr'), cells: c };
+        const f: Frame = makeFrame(layer.id, c);
         frames[f.id] = f;
         return f.id;
       });
@@ -93,6 +95,7 @@ export default function Lab() {
       name: spec.name,
       width: size,
       height: size,
+      layers: [layer],
       frames,
       animations: anims,
       variations: [
@@ -124,11 +127,12 @@ export default function Lab() {
       return;
     }
     const frames: Record<string, Frame> = { ...cur.frames };
+    const lid = cur.layers[0]?.id ?? 'ly_base';
     const existing = new Set(cur.animations.map((a) => a.name));
     const anims: Animation[] = enabledActions.map((def) => {
       const cells = generateActionFrames(spec, def.id, actions[def.id].frames, params);
       const frameIds = cells.map((c) => {
-        const f: Frame = { id: uid('fr'), cells: c };
+        const f: Frame = makeFrame(lid, c);
         frames[f.id] = f;
         return f.id;
       });
@@ -383,7 +387,7 @@ export default function Lab() {
 
 /** Aba de ação com mini-prévia animada */
 function ActionTab({ active, enabled, label, fps, frames, size, onClick }: {
-  active: boolean; enabled: boolean; label: string; fps: number; frames: Frame[]; size: number; onClick: () => void;
+  active: boolean; enabled: boolean; label: string; fps: number; frames: SpriteFrameItem[]; size: number; onClick: () => void;
 }) {
   return (
     <button

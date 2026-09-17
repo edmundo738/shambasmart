@@ -1,9 +1,31 @@
 import { useEffect, useRef } from 'react';
-import { Frame, Variation } from '../types';
-import { renderCellsToCanvas } from '../lib/exporters';
+import { Variation } from '../types';
+import { RenderOpts, renderCellsToCanvas, renderStackToCanvas } from '../lib/exporters';
+
+export interface LayerStackItem {
+  cells: string[];
+  opacity: number;
+}
+
+/** Item de frame: pixels chapados OU pilha de layers (composta com alpha). */
+export interface SpriteFrameItem {
+  id: string;
+  cells?: string[];
+  layers?: LayerStackItem[];
+}
+
+function renderItem(
+  f: SpriteFrameItem, cells: string[] | undefined, layers: LayerStackItem[] | undefined,
+  w: number, h: number, opts: RenderOpts,
+): HTMLCanvasElement {
+  const ly = layers ?? f.layers;
+  if (ly) return renderStackToCanvas(ly, w, h, opts);
+  return renderCellsToCanvas(cells ?? f.cells ?? [], w, h, opts);
+}
 
 interface SpriteCanvasProps {
-  cells: string[];
+  cells?: string[];
+  layers?: LayerStackItem[];
   width: number;
   height: number;
   scale?: number;
@@ -15,27 +37,27 @@ interface SpriteCanvasProps {
 
 /** Renderiza um frame estático */
 export function SpriteCanvas({
-  cells, width, height, scale = 4, variation = null, background = '', className, style,
+  cells, layers, width, height, scale = 4, variation = null, background = '', className, style,
 }: SpriteCanvasProps) {
   const ref = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     const dst = ref.current;
     if (!dst) return;
-    const src = renderCellsToCanvas(cells, width, height, { scale, variation, background });
+    const src = renderItem({ id: 'static' }, cells, layers, width, height, { scale, variation, background });
     dst.width = src.width;
     dst.height = src.height;
     const ctx = dst.getContext('2d')!;
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, dst.width, dst.height);
     ctx.drawImage(src, 0, 0);
-  }, [cells, width, height, scale, variation, background]);
+  }, [cells, layers, width, height, scale, variation, background]);
 
   return <canvas ref={ref} className={`pixelated ${className ?? ''}`} style={style} />;
 }
 
 interface AnimatedSpriteProps {
-  frames: Frame[];
+  frames: SpriteFrameItem[];
   width: number;
   height: number;
   fps?: number;
@@ -73,7 +95,7 @@ export function AnimatedSprite({
         ctx.clearRect(0, 0, dst.width, dst.height);
         return;
       }
-      const src = renderCellsToCanvas(f.cells, s.width, s.height, {
+      const src = renderItem(f, undefined, undefined, s.width, s.height, {
         scale: s.scale, variation: s.variation, background: s.background,
       });
       if (dst.width !== src.width || dst.height !== src.height) {
@@ -123,7 +145,7 @@ export function AnimatedSprite({
     if (!dst || playing) return;
     const f = frames[0];
     if (!f) return;
-    const src = renderCellsToCanvas(f.cells, width, height, { scale, variation, background });
+    const src = renderItem(f, undefined, undefined, width, height, { scale, variation, background });
     dst.width = src.width;
     dst.height = src.height;
     const ctx = dst.getContext('2d')!;

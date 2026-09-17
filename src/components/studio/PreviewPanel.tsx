@@ -3,6 +3,7 @@ import { Eye, Pause, Play } from 'lucide-react';
 import { useStudio } from '../../store/studio';
 import { ORIGINAL_VARIATION_ID } from '../../types';
 import { AnimatedSprite, SpriteCanvas } from '../SpriteView';
+import { celStack, frameItem } from '../../lib/layers';
 
 const BACKGROUNDS = [
   { id: 'checker', label: 'Transparente', css: '', checker: true },
@@ -23,7 +24,7 @@ export default function PreviewPanel() {
   if (!project) return null;
   const anim = project.animations.find((a) => a.id === currentAnimationId) ?? project.animations[0];
   if (!anim) return null;
-  const frames = anim.frameIds.map((fid) => project.frames[fid]).filter(Boolean);
+  const frames = anim.frameIds.map((fid) => project.frames[fid]).filter(Boolean).map((f) => frameItem(project.layers, f));
   const variation = variationId === ORIGINAL_VARIATION_ID
     ? null
     : project.variations.find((v) => v.id === variationId) ?? null;
@@ -88,7 +89,7 @@ export default function PreviewPanel() {
       <div className="thin-scroll flex gap-1 overflow-x-auto rounded-lg border border-ink-700 bg-ink-950 p-1.5">
         {frames.map((f, i) => (
           <div key={f.id} className="shrink-0 text-center">
-            <SpriteCanvas cells={f.cells} width={project.width} height={project.height} scale={1} variation={variation} className="checker h-10 w-10 rounded border border-ink-700 object-contain" />
+            <SpriteCanvas layers={f.layers} width={project.width} height={project.height} scale={1} variation={variation} className="checker h-10 w-10 rounded border border-ink-700 object-contain" />
             <div className="mt-0.5 font-mono text-[9px] text-slate-500">f{String(i).padStart(2, '0')}</div>
           </div>
         ))}

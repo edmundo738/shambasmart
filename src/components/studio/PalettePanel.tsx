@@ -3,6 +3,7 @@ import { Pipette, Plus, Trash2, Wand2 } from 'lucide-react';
 import { useStudio } from '../../store/studio';
 import { STARTER_PALETTES } from '../../lib/templates';
 import { countColors } from '../../lib/pixels';
+import { flattenCells } from '../../lib/layers';
 import { normalizeHex } from '../../lib/color';
 
 export default function PalettePanel() {
@@ -21,7 +22,7 @@ export default function PalettePanel() {
   const extractFromFrame = () => {
     const f = currentFrameId ? project.frames[currentFrameId] : undefined;
     if (!f) return;
-    const top = countColors(f.cells).slice(0, 16).map((c) => normalizeHex(c.color));
+    const top = countColors(flattenCells(project, f)).slice(0, 16).map((c) => normalizeHex(c.color));
     if (top.length) loadPalette(top);
   };
 

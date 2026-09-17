@@ -168,9 +168,9 @@ Legenda de status: ✅ sólido · 🟡 funcional mas amador · 🔴 ausente/frá
 
 ---
 
-## Veredito FASE A (esta entrega)
+## Veredito FASE A (entregue)
 
-1. Interpolação de traço (fim do tracejado). 
+1. Interpolação de traço (fim do tracejado).
 2. Pixel-perfect 1px (default ON) + toggle `P`.
 3. Pular `paint` redundante.
 4. `fill` só empilha undo se mudou algo.
@@ -178,3 +178,17 @@ Legenda de status: ✅ sólido · 🟡 funcional mas amador · 🔴 ausente/frá
 6. Preview de forma = resultado final (espelho + Shift).
 7. Remover stub morto `fillAt`.
 8. Suíte de testes `tests/pixel/` (vitest) cobrindo os algoritmos acima.
+
+## Veredito FASE B1 (entregue)
+
+1. Modelo `frame × layer = cel` (`Frame.cels`, `ProjectData.layers`).
+2. `src/lib/layers.ts`: composite fundo→topo, flatten topmost-wins, migração idempotente.
+3. `LayersPanel`: add/renomear/excluir/reordenar + vis/lock/opacidade, tudo funcional.
+4. Pintura respeita camada atual + lock; conta-gotas lê o composto.
+5. Render (canvas, thumbs, previews) e export (sheet/GIF/sequência/PNG) por camada com alpha.
+6. Undo/redo inclui estrutura das layers; metadata do ZIP lista as layers.
+7. Testes `tests/pixel/layers.test.ts` (12 testes: composite, migração, idempotência).
+
+## FASE B2 (próxima)
+
+Seleção retangular + mover (arrastar, setas, Esc), undo em paleta/variações, `.gpl`.

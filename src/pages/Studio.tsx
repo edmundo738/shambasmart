@@ -13,6 +13,7 @@ import PalettePanel from '../components/studio/PalettePanel';
 import PreviewPanel from '../components/studio/PreviewPanel';
 import RecipeCard from '../components/studio/RecipeCard';
 import MasterPanel from '../components/studio/MasterPanel';
+import LayersPanel from '../components/studio/LayersPanel';
 import ExportModal from '../components/studio/ExportModal';
 import { TEMPLATES } from '../lib/templates';
 
@@ -221,6 +222,7 @@ export default function Studio() {
 
         {/* painel direito */}
         <aside className="thin-scroll flex w-full shrink-0 flex-col gap-3 overflow-y-auto lg:w-80">
+          <LayersPanel />
           <PreviewPanel />
           <RecipeCard />
           <MasterPanel />

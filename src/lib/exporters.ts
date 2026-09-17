@@ -4,6 +4,7 @@ import {
   Animation, EnginePreset, Frame, ORIGINAL_VARIATION_ID, ProjectData, Variation,
 } from '../types';
 import { applyVariationToColor } from './color';
+import { compositeStack } from './layers';
 
 /* ------------------------------- render base ------------------------------ */
 
@@ -34,6 +35,44 @@ export function renderCellsToCanvas(
     }
   }
   return canvas;
+}
+
+/** Compõe uma pilha pré-computada (cells + opacidade por camada). */
+export function renderStackToCanvas(
+  stack: Array<{ cells: string[]; opacity: number }>,
+  w: number, h: number, opts: RenderOpts = {},
+): HTMLCanvasElement {
+  const { scale = 1, variation = null, background = '' } = opts;
+  const canvas = document.createElement('canvas');
+  canvas.width = w * scale;
+  canvas.height = h * scale;
+  const ctx = canvas.getContext('2d')!;
+  if (background) {
+    ctx.fillStyle = background;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  for (const { cells, opacity } of stack) {
+    if (opacity <= 0) continue;
+    ctx.globalAlpha = Math.max(0, Math.min(1, opacity / 100));
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const c = applyVariationToColor(cells[y * w + x] ?? '', variation);
+        if (!c) continue;
+        ctx.fillStyle = c;
+        ctx.fillRect(x * scale, y * scale, scale, scale);
+      }
+    }
+  }
+  ctx.globalAlpha = 1;
+  return canvas;
+}
+
+/** Compõe um frame camada por camada (fundo→topo), com alpha por layer. */
+export function renderFrameToCanvas(
+  project: ProjectData, frame: Frame, opts: RenderOpts = {},
+): HTMLCanvasElement {
+  const stack = compositeStack(project, frame).map(({ layer, cells }) => ({ cells, opacity: layer.opacity }));
+  return renderStackToCanvas(stack, project.width, project.height, opts);
 }
 
 export function slugify(s: string): string {
@@ -73,9 +112,10 @@ export interface SheetOpts extends RenderOpts {
 export interface SheetRect { x: number; y: number; w: number; h: number }
 
 export function buildSpritesheet(
-  frames: Frame[], w: number, h: number, opts: SheetOpts = {},
+  project: ProjectData, frames: Frame[], opts: SheetOpts = {},
 ): { canvas: HTMLCanvasElement; rects: SheetRect[] } {
   const { columns = 0, padding = 0, scale = 1, variation = null, background = '' } = opts;
+  const w = project.width, h = project.height;
   const cols = columns > 0 ? columns : Math.max(1, frames.length);
   const rows = Math.max(1, Math.ceil(frames.length / cols));
   const fw = w * scale;
@@ -94,7 +134,7 @@ export function buildSpritesheet(
     const row = Math.floor(i / cols);
     const ox = col * (fw + padding);
     const oy = row * (fh + padding);
-    const tile = renderCellsToCanvas(f.cells, w, h, { scale, variation });
+    const tile = renderFrameToCanvas(project, f, { scale, variation });
     ctx.drawImage(tile, ox, oy);
     rects.push({ x: ox, y: oy, w: fw, h: fh });
   });
@@ -113,6 +153,7 @@ export function buildMetadata(
   names: string[],
   rects: SheetRect[],
   fps: number,
+  layers: Array<{ name: string; visible: boolean; opacity: number }> = [],
 ): object {
   switch (engine) {
     case 'phaser': {
@@ -129,31 +170,31 @@ export function buildMetadata(
       });
       return {
         frames,
-        meta: { app: 'PixelForge Studio', version: '1.0', image: imageFile, format: 'RGBA8888', size: { w: sheetW, h: sheetH }, scale: 1 },
+        meta: { app: 'PixelForge Studio', version: '1.0', image: imageFile, format: 'RGBA8888', size: { w: sheetW, h: sheetH }, scale: 1, layers },
       };
     }
     case 'unity': {
       return {
         frames: names.map((n, i) => ({ name: n, fps, rect: { ...rects[i] } })),
-        meta: { app: 'PixelForge Studio', image: imageFile, sheetSize: { w: sheetW, h: sheetH }, note: 'Importe como Sprite (Multiple) e fatie pela grade, ou use estes rects.' },
+        meta: { app: 'PixelForge Studio', image: imageFile, sheetSize: { w: sheetW, h: sheetH }, note: 'Importe como Sprite (Multiple) e fatie pela grade, ou use estes rects.', layers },
       };
     }
     case 'godot': {
       return {
         frames: names.map((n, i) => ({ name: n, ...rects[i] })),
-        meta: { app: 'PixelForge Studio', image: imageFile, sheetSize: { w: sheetW, h: sheetH }, fps, note: 'Use AtlasTexture com estes region rects, ou AnimatedSprite2D com SpriteFrames.' },
+        meta: { app: 'PixelForge Studio', image: imageFile, sheetSize: { w: sheetW, h: sheetH }, fps, note: 'Use AtlasTexture com estes region rects, ou AnimatedSprite2D com SpriteFrames.', layers },
       };
     }
     case 'gamemaker': {
       return {
         frames: names.map((n, i) => ({ name: n, ...rects[i] })),
-        meta: { app: 'PixelForge Studio', image: imageFile, fps, note: 'Importe a strip na ordem dos frames (esquerda -> direita, cima -> baixo).' },
+        meta: { app: 'PixelForge Studio', image: imageFile, fps, note: 'Importe a strip na ordem dos frames (esquerda -> direita, cima -> baixo).', layers },
       };
     }
     default: {
       return {
         frames: names.map((n, i) => ({ name: n, ...rects[i] })),
-        meta: { app: 'PixelForge Studio', image: imageFile, sheetSize: { w: sheetW, h: sheetH }, frameSize: { w: frameW, h: frameH }, fps },
+        meta: { app: 'PixelForge Studio', image: imageFile, sheetSize: { w: sheetW, h: sheetH }, frameSize: { w: frameW, h: frameH }, fps, layers },
       };
     }
   }
@@ -162,12 +203,13 @@ export function buildMetadata(
 /* ----------------------------------- GIF ---------------------------------- */
 
 export function encodeGif(
-  frames: Frame[], w: number, h: number, fps: number, scale: number, variation: Variation | null,
+  project: ProjectData, frames: Frame[], fps: number, scale: number, variation: Variation | null,
 ): Uint8Array {
+  const w = project.width, h = project.height;
   const gif = GIFEncoder();
   const delay = Math.max(20, Math.round(1000 / Math.max(1, fps)));
   const datas: Uint8ClampedArray[] = frames.map((f) => {
-    const c = renderCellsToCanvas(f.cells, w, h, { scale, variation });
+    const c = renderFrameToCanvas(project, f, { scale, variation });
     return c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data;
   });
   const width = w * scale;
@@ -252,7 +294,7 @@ export async function buildPackZip(project: ProjectData, opts: PackOpts): Promis
       const frameNames = frames.map((_, i) => `${base}_f${String(i).padStart(2, '0')}.png`);
 
       if (opts.includeSheet) {
-        const { canvas, rects } = buildSpritesheet(frames, project.width, project.height, {
+        const { canvas, rects } = buildSpritesheet(project, frames, {
           columns: opts.columns, padding: opts.padding, scale: opts.scale,
           variation: combo.v, background: opts.background,
         });
@@ -263,6 +305,7 @@ export async function buildPackZip(project: ProjectData, opts: PackOpts): Promis
             opts.engine, `${base}.png`, canvas.width, canvas.height,
             project.width * opts.scale, project.height * opts.scale,
             frameNames, rects, anim.fps,
+            project.layers.map((l) => ({ name: l.name, visible: l.visible, opacity: l.opacity })),
           );
           folder.file(`${base}.json`, JSON.stringify(meta, null, 2));
         }
@@ -271,7 +314,7 @@ export async function buildPackZip(project: ProjectData, opts: PackOpts): Promis
       if (opts.includeSequence) {
         const seqFolder = folder.folder(`${base}_frames`)!;
         for (let i = 0; i < frames.length; i++) {
-          const c = renderCellsToCanvas(frames[i].cells, project.width, project.height, {
+          const c = renderFrameToCanvas(project, frames[i], {
             scale: opts.scale, variation: combo.v, background: opts.background,
           });
           seqFolder.file(frameNames[i], await canvasToBlob(c));
@@ -281,7 +324,7 @@ export async function buildPackZip(project: ProjectData, opts: PackOpts): Promis
       if (opts.includeGif) {
         try {
           const gifScale = Math.max(1, Math.min(opts.scale, Math.floor(256 / Math.max(project.width, project.height)) || 1));
-          const bytes = encodeGif(frames, project.width, project.height, anim.fps, gifScale, combo.v);
+          const bytes = encodeGif(project, frames, anim.fps, gifScale, combo.v);
           folder.file(`${base}.gif`, bytes);
         } catch {
           /* ignora falha isolada de GIF */
@@ -329,6 +372,6 @@ export async function downloadSingleFrame(
 ) {
   const frame = project.frames[frameId];
   if (!frame) return;
-  const canvas = renderCellsToCanvas(frame.cells, project.width, project.height, { scale, variation, background });
+  const canvas = renderFrameToCanvas(project, frame, { scale, variation, background });
   downloadBlob(await canvasToBlob(canvas), `${slugify(project.name)}_frame.png`);
 }

@@ -114,8 +114,10 @@ obrigatório em `docs/BENCHMARK.md` (referência × atual × alvo por sistema).
 
 - [x] **FASE A — Pixel Editor**: interpolação de traço, pixel-perfect 1px (default ON),
   dedupe de paint, fill sem undo vazio, atalho Y, preview de forma fiel, `tests/pixel/` (vitest, 24 testes)
-- [ ] **FASE B — Layers + Timeline base**: modelo frame × layer = cel, seleção retangular
-  + mover, undo em paleta, importar `.gpl`
+- [x] **FASE B1 — Layers**: modelo frame × layer = cel + `LayersPanel` + migração
+  idempotente + composite com alpha no render/export + layers no undo (36 testes verdes)
+- [ ] **FASE B2 — Seleção + paleta**: seleção retangular + mover, undo em paleta,
+  importar/exportar `.gpl`
 - [ ] **FASE C — Animation**: copiar/colar frames, drag-reorder, duração por frame,
   onion prev/next configurável, ping-pong/reverso, preview 1x
 - [ ] **FASE D — Rig**: bones editáveis (FK correto, coordenadas local/pai/mundo),

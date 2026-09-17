@@ -1,6 +1,7 @@
 import { ArrowLeft, ArrowRight, Copy, Eraser, Film, Pause, Play, Plus, Trash2 } from 'lucide-react';
 import { useStudio } from '../../store/studio';
 import { SpriteCanvas } from '../SpriteView';
+import { celStack } from '../../lib/layers';
 
 export default function Timeline() {
   const project = useStudio((s) => s.project);
@@ -60,7 +61,7 @@ export default function Timeline() {
               }`}
             >
               <button onClick={() => select(anim.id, fid)} title={`Frame ${i}`}>
-                <SpriteCanvas cells={f.cells} width={project.width} height={project.height} scale={2} className="h-16 w-16 rounded object-contain" />
+                <SpriteCanvas layers={celStack(project.layers, f)} width={project.width} height={project.height} scale={2} className="h-16 w-16 rounded object-contain" />
               </button>
               <div className={`mt-0.5 text-center font-mono text-[10px] ${active ? 'text-forge-300' : 'text-slate-500'}`}>
                 f{String(i).padStart(2, '0')}
@@ -70,7 +71,7 @@ export default function Timeline() {
                   <button className={iconBtn} title="Mover para esquerda" onClick={() => moveFrame(fid, -1)} disabled={i === 0}><ArrowLeft size={13} /></button>
                   <button className={iconBtn} title="Mover para direita" onClick={() => moveFrame(fid, 1)} disabled={i === anim.frameIds.length - 1}><ArrowRight size={13} /></button>
                   <button className={iconBtn} title="Duplicar" onClick={() => duplicateFrame(fid)}><Copy size={13} /></button>
-                  <button className={iconBtn} title="Limpar pixels" onClick={() => clearFrame(fid)}><Eraser size={13} /></button>
+                  <button className={iconBtn} title="Limpar camada atual" onClick={() => clearFrame(fid)}><Eraser size={13} /></button>
                   <button className={iconBtn} title="Excluir frame" onClick={() => deleteFrame(fid)} disabled={anim.frameIds.length <= 1}><Trash2 size={13} /></button>
                 </div>
               )}

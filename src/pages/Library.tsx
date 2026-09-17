@@ -4,6 +4,7 @@ import {
   ArrowLeft, Boxes, Dices, Download, Layers, Search, Shuffle, Sparkles, X,
 } from 'lucide-react';
 import { AnimatedSprite } from '../components/SpriteView';
+import { frameItem } from '../lib/layers';
 import { useProjects } from '../store/projects';
 import {
   BUNDLES, BundleDef, buildBundleZip, generateBundle, spriteToProjectData,
@@ -41,7 +42,7 @@ function spriteFromRecipe(r: AssetRecipe): GeneratedSprite {
 
 function AnimThumb({ project, box = 'h-16 w-16' }: { project: ProjectData; box?: string }) {
   const anim = project.animations[0];
-  const frames = anim ? anim.frameIds.map((fid) => project.frames[fid]).filter(Boolean) : [];
+  const frames = anim ? anim.frameIds.map((fid) => project.frames[fid]).filter(Boolean).map((f) => frameItem(project.layers, f)) : [];
   if (!anim || !frames.length) return <span className="text-xs text-slate-600">vazio</span>;
   return (
     <AnimatedSprite

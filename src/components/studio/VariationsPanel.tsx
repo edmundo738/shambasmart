@@ -3,6 +3,7 @@ import { Dices, Plus, RotateCcw, Sparkles, Trash2 } from 'lucide-react';
 import { useStudio } from '../../store/studio';
 import { ORIGINAL_VARIATION_ID, Variation } from '../../types';
 import { countColors } from '../../lib/pixels';
+import { flattenCells, frameItem } from '../../lib/layers';
 import { normalizeHex } from '../../lib/color';
 import { AnimatedSprite } from '../SpriteView';
 
@@ -32,14 +33,14 @@ export default function VariationsPanel() {
     if (!project) return [];
     const anim = project.animations.find((a) => a.id === currentAnimationId) ?? project.animations[0];
     if (!anim) return [];
-    return anim.frameIds.map((fid) => project.frames[fid]).filter(Boolean);
+    return anim.frameIds.map((fid) => project.frames[fid]).filter(Boolean).map((f) => frameItem(project.layers, f));
   }, [project, currentAnimationId]);
 
   const topColors = useMemo(() => {
     if (!project || !currentFrameId) return [];
     const f = project.frames[currentFrameId];
     if (!f) return [];
-    return countColors(f.cells).slice(0, 12);
+    return countColors(flattenCells(project, f)).slice(0, 12);
   }, [project, currentFrameId]);
 
   if (!project) return null;

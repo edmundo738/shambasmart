@@ -1,5 +1,6 @@
 import JSZip from 'jszip';
 import { Animation, Frame, ProjectData, uid } from '../../types';
+import { createLayer, makeFrame } from '../layers';
 import { buildPackZip, slugify } from '../exporters';
 import { GeneratedSprite, SpriteKind, generateSprite } from './sprites';
 import { StyleId } from './styles';
@@ -85,10 +86,11 @@ export function generateBundle(seed: number, def: BundleDef, size: number, outli
 
 /** Converte um sprite gerado em ProjectData (reutilizado por Gerador/Biblioteca). */
 export function spriteToProjectData(sprite: GeneratedSprite, size: number, bundle?: string): ProjectData {
+  const layer = createLayer('Camada 1');
   const frames: Record<string, Frame> = {};
   const anims: Animation[] = sprite.actions.map((a) => {
     const frameIds = a.frames.map((cells) => {
-      const f: Frame = { id: uid('fr'), cells };
+      const f: Frame = makeFrame(layer.id, cells);
       frames[f.id] = f;
       return f.id;
     });
@@ -100,6 +102,7 @@ export function spriteToProjectData(sprite: GeneratedSprite, size: number, bundl
     name: sprite.name,
     width: size,
     height: size,
+    layers: [layer],
     frames,
     animations: anims,
     variations: [{ id: uid('vr'), name: 'sombra', mapping: {}, hue: 0, sat: -10, light: -22 }],

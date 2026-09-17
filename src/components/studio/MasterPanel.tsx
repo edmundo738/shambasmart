@@ -4,6 +4,7 @@ import {
 } from 'lucide-react';
 import { useStudio } from '../../store/studio';
 import { AnimatedSprite } from '../SpriteView';
+import { flattenCells } from '../../lib/layers';
 import { ENGINE_VERSION } from '../../lib/core/engine';
 import { compareFrames, fromRecipe, serializeMaster } from '../../lib/core/assetMaster';
 import { skeletonById } from '../../lib/core/skeletons';
@@ -42,7 +43,7 @@ export default function MasterPanel() {
     try {
       const first = project.animations[0];
       const fid = first?.frameIds[0];
-      const base = fid ? project.frames[fid]?.cells : undefined;
+      const base = fid && project.frames[fid] ? flattenCells(project, project.frames[fid]) : undefined;
       return resolveMotion(project.recipe ?? null, selected, base, project.width);
     } catch {
       return null;
@@ -61,7 +62,7 @@ export default function MasterPanel() {
     for (const anim of project.animations) {
       for (const fid of anim.frameIds) {
         const f = project.frames[fid];
-        if (f) actual.push(f.cells);
+        if (f) actual.push(flattenCells(project, f));
       }
     }
     const c = compareFrames(expected, actual);

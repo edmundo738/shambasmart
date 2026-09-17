@@ -12,6 +12,7 @@ import { AnimatedSprite } from '../components/SpriteView';
 import { useProjects } from '../store/projects';
 import { buildPackZip, downloadBlob, slugify } from '../lib/exporters';
 import { Animation, Frame, ProjectData, uid } from '../types';
+import { createLayer, makeFrame } from '../lib/layers';
 
 const KIND_ICONS: Record<SpriteKind, React.ReactNode> = {
   personagem: <PersonStanding size={22} />,
@@ -95,10 +96,11 @@ export default function Generator() {
   }, []);
 
   const buildProjectData = (): ProjectData => {
+    const layer = createLayer('Camada 1');
     const frames: Record<string, Frame> = {};
     const anims: Animation[] = sprite.actions.map((a) => {
       const frameIds = a.frames.map((cells) => {
-        const f: Frame = { id: uid('fr'), cells };
+        const f: Frame = makeFrame(layer.id, cells);
         frames[f.id] = f;
         return f.id;
       });
@@ -107,6 +109,7 @@ export default function Generator() {
     const now = Date.now();
     return {
       id: uid('pj'), name: sprite.name, width: size, height: size,
+      layers: [layer],
       frames, animations: anims,
       variations: [{ id: uid('vr'), name: 'sombra', mapping: {}, hue: 0, sat: -10, light: -22 }],
       palette: sprite.palette, recipe: sprite.recipe, createdAt: now, updatedAt: now,

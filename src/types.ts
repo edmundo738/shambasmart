@@ -1,9 +1,19 @@
 /** Célula: "" = transparente, ou cor hexadecimal "#rrggbb" */
 export type Cell = string;
 
+export interface Layer {
+  id: string;
+  name: string;
+  visible: boolean;
+  locked: boolean;
+  /** 0..100 */
+  opacity: number;
+}
+
 export interface Frame {
   id: string;
-  cells: Cell[];
+  /** cel por layer: layerId -> pixels (frame × layer = cel) */
+  cels: Record<string, Cell[]>;
 }
 
 export interface Animation {
@@ -42,6 +52,8 @@ export interface ProjectData {
   name: string;
   width: number;
   height: number;
+  /** ordem: índice 0 = fundo */
+  layers: Layer[];
   frames: Record<string, Frame>;
   animations: Animation[];
   variations: Variation[];

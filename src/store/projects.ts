@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { ProjectData, uid } from '../types';
-import { renderCellsToCanvas } from '../lib/exporters';
+import { renderFrameToCanvas } from '../lib/exporters';
+import { migrateProject } from '../lib/layers';
 
 export interface ProjectMeta {
   id: string;
@@ -38,12 +39,13 @@ function writeMeta(list: ProjectMeta[]) {
 
 function makeThumb(p: ProjectData): string {
   try {
-    const anim = p.animations[0];
+    const proj = migrateProject(p);
+    const anim = proj.animations[0];
     const fid = anim?.frameIds[0];
-    const frame = fid ? p.frames[fid] : undefined;
+    const frame = fid ? proj.frames[fid] : undefined;
     if (!frame) return '';
-    const scale = Math.max(1, Math.floor(96 / Math.max(p.width, p.height)));
-    const canvas = renderCellsToCanvas(frame.cells, p.width, p.height, { scale });
+    const scale = Math.max(1, Math.floor(96 / Math.max(proj.width, proj.height)));
+    const canvas = renderFrameToCanvas(proj, frame, { scale });
     return canvas.toDataURL('image/png');
   } catch {
     return '';
@@ -94,7 +96,7 @@ export const useProjects = create<ProjectsState>((set) => ({
     try {
       const raw = localStorage.getItem(fullKey(id));
       if (!raw) return null;
-      return JSON.parse(raw) as ProjectData;
+      return migrateProject(JSON.parse(raw) as ProjectData);
     } catch {
       return null;
     }
