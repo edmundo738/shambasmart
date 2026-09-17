@@ -1,5 +1,5 @@
 import {
-  Brush, Circle, Eraser, FlipHorizontal2, FlipVertical2, Grid3x3, Layers, PaintBucket, Pipette, Slash, Square,
+  Brush, Circle, Crosshair, Eraser, FlipHorizontal2, FlipVertical2, Grid3x3, Layers, PaintBucket, Pipette, Slash, Square,
 } from 'lucide-react';
 import { useStudio } from '../../store/studio';
 import { ToolId } from '../../types';
@@ -25,6 +25,8 @@ export default function Toolbar() {
   const toggleMirrorY = useStudio((s) => s.toggleMirrorY);
   const showGrid = useStudio((s) => s.showGrid);
   const toggleGrid = useStudio((s) => s.toggleGrid);
+  const pixelPerfect = useStudio((s) => s.pixelPerfect);
+  const togglePixelPerfect = useStudio((s) => s.togglePixelPerfect);
   const onionSkin = useStudio((s) => s.onionSkin);
   const toggleOnion = useStudio((s) => s.toggleOnion);
 
@@ -76,6 +78,9 @@ export default function Toolbar() {
       </button>
       <button title="Mostrar grade" onClick={toggleGrid} className={btn(showGrid)}>
         <Grid3x3 size={18} />
+      </button>
+      <button title="Pixel-perfect 1px (P)" onClick={togglePixelPerfect} className={btn(pixelPerfect)}>
+        <Crosshair size={18} />
       </button>
       <button title="Onion skin (ver frame anterior)" onClick={toggleOnion} className={btn(onionSkin)}>
         <Layers size={18} />

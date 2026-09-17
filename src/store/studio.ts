@@ -30,6 +30,7 @@ interface StudioState {
   tool: ToolId;
   color: string;
   brushSize: number;
+  pixelPerfect: boolean;
   mirrorX: boolean;
   mirrorY: boolean;
   showGrid: boolean;
@@ -54,6 +55,7 @@ interface StudioState {
   setTool: (t: ToolId) => void;
   setColor: (c: string) => void;
   setBrushSize: (n: number) => void;
+  togglePixelPerfect: () => void;
   toggleMirrorX: () => void;
   toggleMirrorY: () => void;
   toggleGrid: () => void;
@@ -66,7 +68,7 @@ interface StudioState {
   // pintura
   beginStroke: () => void;
   paint: (indices: number[], color: string | null) => void;
-  fillAt: (index: number, color: string) => void;
+  paintPatch: (patches: Array<[number, string]>) => void;
   drawShape: (indices: number[], color: string) => void;
 
   // frames
@@ -119,6 +121,7 @@ export const useStudio = create<StudioState>((set, get) => ({
   tool: 'brush',
   color: '#ff4d6d',
   brushSize: 1,
+  pixelPerfect: true,
   mirrorX: false,
   mirrorY: false,
   showGrid: true,
@@ -181,6 +184,7 @@ export const useStudio = create<StudioState>((set, get) => ({
   setTool: (tool) => set({ tool }),
   setColor: (color) => set({ color: normalizeHex(color) }),
   setBrushSize: (brushSize) => set({ brushSize: Math.max(1, Math.min(8, brushSize)) }),
+  togglePixelPerfect: () => set((s) => ({ pixelPerfect: !s.pixelPerfect })),
   toggleMirrorX: () => set((s) => ({ mirrorX: !s.mirrorX })),
   toggleMirrorY: () => set((s) => ({ mirrorY: !s.mirrorY })),
   toggleGrid: () => set((s) => ({ showGrid: !s.showGrid })),
@@ -217,12 +221,21 @@ export const useStudio = create<StudioState>((set, get) => ({
     };
   }),
 
-  fillAt: (index, color) => {
-    const s = get();
-    if (!s.project || !s.currentFrameId) return;
-    // flood fill é calculado pelo componente (precisa da grade atual)
-    void index; void color;
-  },
+  paintPatch: (patches) => set((s) => {
+    if (!s.project || !s.currentFrameId || !patches.length) return {};
+    const frame = s.project.frames[s.currentFrameId];
+    if (!frame) return {};
+    const cells = [...frame.cells];
+    for (const [i, c] of patches) cells[i] = c ? normalizeHex(c) : '';
+    return {
+      project: {
+        ...s.project,
+        frames: { ...s.project.frames, [frame.id]: { ...frame, cells } },
+        updatedAt: Date.now(),
+      },
+      dirty: true,
+    };
+  }),
 
   drawShape: (indices, color) => {
     const s = get();

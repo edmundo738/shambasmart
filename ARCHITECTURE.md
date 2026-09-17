@@ -106,7 +106,31 @@ Regras de engenharia:
 - [x] **F16 (parcial) — AssetCore**: `AssetMaster` serializável + fingerprint + `parseMaster` (versionamento/migração pendentes)
 - [x] **F17 (parcial) — SkeletonCore/MotionCore**: 4 esqueletos resolvidos nos motores reais + catálogo aplicável rig/retarget/procedural (IK, bird/snake/dragon, custom pendentes)
 
-## 4. Spec v2 (§26) → arquivos (status)
+## 4. Virada vertical (prioridade atual — QUALIDADE > QUANTIDADE)
+
+Expansão horizontal PAUSADA. Nada de 2.5D, IA, marketplace ou novos geradores até o
+núcleo competir com Aseprite/Pixelorama/SpriteForge no que promete. Benchmark
+obrigatório em `docs/BENCHMARK.md` (referência × atual × alvo por sistema).
+
+- [x] **FASE A — Pixel Editor**: interpolação de traço, pixel-perfect 1px (default ON),
+  dedupe de paint, fill sem undo vazio, atalho Y, preview de forma fiel, `tests/pixel/` (vitest, 24 testes)
+- [ ] **FASE B — Layers + Timeline base**: modelo frame × layer = cel, seleção retangular
+  + mover, undo em paleta, importar `.gpl`
+- [ ] **FASE C — Animation**: copiar/colar frames, drag-reorder, duração por frame,
+  onion prev/next configurável, ping-pong/reverso, preview 1x
+- [ ] **FASE D — Rig**: bones editáveis (FK correto, coordenadas local/pai/mundo),
+  render pixel-snapped, anchors/hitboxes no export
+- [ ] **FASE E — IK**: two-bone + FABRIK estável com limites, foot/hand targets
+- [ ] **FASE F — Motion**: 6 movimentos (idle/walk/run/jump/attack/hurt) com princípios
+  de animação + curvas + retargeting entre proporções + edição pós-geração
+- [ ] **FASE G — Import/Export**: PNG, spritesheet (linhas×colunas), frames avulsos, APNG
+- [ ] **FASE H — Persistence**: paleta/variações no histórico, diff por cel se 256px+
+  reprovar, snapshots + recuperação
+- [ ] **FASE I — Performance**: tabela render/paint 32→2048 × 10/50/100 frames, 60fps
+- [ ] **FASE J — Visual Regression**: `test_character_01`, `test_walk_01` etc. como referência
+- [ ] **SÓ DEPOIS — FASE K–N**: procedural avançado, roupas, multi-angle, 2.5D
+
+## 5. Spec v2 (§26) → arquivos (status)
 
 | Módulo da spec | Arquivo(s) | Status |
 |---|---|---|
@@ -132,7 +156,7 @@ Regras de engenharia:
 - [ ] **F14 — Performance**: workers, OffscreenCanvas, cache incremental, 60fps
 - [ ] **F15 — QA**: suíte de regressão por seeds + checklist de demo (20 itens)
 
-## 5. Modelo de negócio (resumo)
+## 6. Modelo de negócio (resumo)
 
 Edição + export básico sempre úteis no grátis, sem watermark obrigatório.
 Cobrança = nuvem, colaboração, render/batch pesado, versionamento, equipes.

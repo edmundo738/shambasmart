@@ -1,13 +1,18 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useStudio } from '../../store/studio';
 import {
-  brushIndices, ellipsePoints, floodFill, idx, inBounds, linePoints, mirrorPoints, rectPoints,
+  brushIndices, ellipsePoints, floodFill, idx, inBounds, linePoints, mirrorPoints,
+  pixelPerfectStep, rectPoints,
 } from '../../lib/pixels';
 
 export default function PixelCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
-  const drag = useRef<{ drawing: boolean; startX: number; startY: number; erase: boolean } | null>(null);
+  const drag = useRef<{
+    drawing: boolean; startX: number; startY: number; erase: boolean;
+    lastX: number; lastY: number; lastKey: string;
+    trail: Array<[number, number]>; orig: string[] | null;
+  } | null>(null);
 
   const project = useStudio((s) => s.project);
   const currentAnimationId = useStudio((s) => s.currentAnimationId);
@@ -88,24 +93,57 @@ export default function PixelCanvas() {
     return [x, y];
   }, [project]);
 
-  const expandMirror = useCallback((x: number, y: number): number[] => {
+  /** Traço com interpolação (sem falhas), pixel-perfect e dedupe de eventos. */
+  const applyStrokeTo = useCallback((x: number, y: number, erase: boolean) => {
+    const d = drag.current;
     const st = useStudio.getState();
     const p = st.project;
-    if (!p) return [];
-    const pts = mirrorPoints(x, y, p.width, p.height, st.mirrorX, st.mirrorY);
-    const out = new Set<number>();
-    for (const [mx, my] of pts) {
-      for (const i of brushIndices(mx, my, st.brushSize, p.width, p.height)) out.add(i);
+    if (!d || !p) return;
+    // interpola o segmento entre o último ponto e o atual: traço rápido não falha
+    const seg = linePoints(d.lastX, d.lastY, x, y);
+    d.lastX = x;
+    d.lastY = y;
+    const color = erase ? '' : st.color;
+    const usePP = st.pixelPerfect && st.brushSize === 1 && !st.mirrorX && !st.mirrorY && d.orig !== null;
+
+    if (usePP) {
+      let trail = d.trail;
+      const patches: Array<[number, string]> = [];
+      for (const pt of seg) {
+        const step = pixelPerfectStep(trail, pt);
+        trail = step.trail;
+        for (const [ux, uy] of step.unpaint) {
+          if (inBounds(ux, uy, p.width, p.height)) {
+            patches.push([idx(ux, uy, p.width), d.orig![idx(ux, uy, p.width)]]);
+          }
+        }
+        for (const [px, py] of step.paint) {
+          if (inBounds(px, py, p.width, p.height)) patches.push([idx(px, py, p.width), color]);
+        }
+      }
+      d.trail = trail;
+      if (!patches.length) return;
+      const key = patches.map(([i, c]) => `${i}:${c}`).join(',');
+      if (key === d.lastKey) return;
+      d.lastKey = key;
+      st.paintPatch(patches);
+      return;
     }
-    return [...out];
+
+    const indices = new Set<number>();
+    for (const [sx, sy] of seg) {
+      for (const [mx, my] of mirrorPoints(sx, sy, p.width, p.height, st.mirrorX, st.mirrorY)) {
+        for (const i of brushIndices(mx, my, st.brushSize, p.width, p.height)) indices.add(i);
+      }
+    }
+    if (!indices.size) return;
+    const key = `${erase ? 'e' : color}|${[...indices].sort((a, b) => a - b).join(',')}`;
+    if (key === d.lastKey) return;
+    d.lastKey = key;
+    st.paint([...indices], erase ? null : st.color);
   }, []);
 
-  const applyPaint = useCallback((x: number, y: number, erase: boolean) => {
-    const st = useStudio.getState();
-    st.paint(expandMirror(x, y), erase ? null : st.color);
-  }, [expandMirror]);
-
-  const drawOverlayShape = useCallback((x1: number, y1: number) => {
+  const drawOverlayShape = useCallback((x1: number, y1: number, filled: boolean) => {
     const d = drag.current;
     const overlay = overlayRef.current;
     const st = useStudio.getState();
@@ -117,16 +155,19 @@ export default function PixelCanvas() {
     ctx.imageSmoothingEnabled = false;
     let pts: Array<[number, number]> = [];
     if (st.tool === 'line') pts = linePoints(d.startX, d.startY, x1, y1);
-    else if (st.tool === 'rect') pts = rectPoints(d.startX, d.startY, x1, y1, false);
+    else if (st.tool === 'rect') pts = rectPoints(d.startX, d.startY, x1, y1, filled);
     else if (st.tool === 'ellipse') {
       const cx = (d.startX + x1) / 2;
       const cy = (d.startY + y1) / 2;
-      pts = ellipsePoints(cx, cy, Math.abs(x1 - d.startX) / 2, Math.abs(y1 - d.startY) / 2, false);
+      pts = ellipsePoints(cx, cy, Math.abs(x1 - d.startX) / 2, Math.abs(y1 - d.startY) / 2, filled);
     }
     ctx.fillStyle = st.color;
     ctx.globalAlpha = 0.75;
+    // preview idêntico ao resultado: com espelho aplicado
     for (const [x, y] of pts) {
-      if (inBounds(x, y, p.width, p.height)) ctx.fillRect(x * st.zoom, y * st.zoom, st.zoom, st.zoom);
+      for (const [mx, my] of mirrorPoints(x, y, p.width, p.height, st.mirrorX, st.mirrorY)) {
+        if (inBounds(mx, my, p.width, p.height)) ctx.fillRect(mx * st.zoom, my * st.zoom, st.zoom, st.zoom);
+      }
     }
     ctx.globalAlpha = 1;
   }, []);
@@ -156,21 +197,25 @@ export default function PixelCanvas() {
     const erase = e.button === 2 || st.tool === 'eraser';
 
     if (st.tool === 'fill') {
-      st.beginStroke();
       const changed = floodFill(frame.cells, project.width, project.height, x, y, erase ? '' : st.color);
-      if (changed.length) st.paint(changed, erase ? null : st.color);
+      // só empilha undo se algo realmente mudou
+      if (changed.length) {
+        st.beginStroke();
+        st.paint(changed, erase ? null : st.color);
+      }
       return;
     }
 
     if (st.tool === 'line' || st.tool === 'rect' || st.tool === 'ellipse') {
-      drag.current = { drawing: true, startX: x, startY: y, erase };
-      drawOverlayShape(x, y);
+      drag.current = { drawing: true, startX: x, startY: y, erase, lastX: x, lastY: y, lastKey: '', trail: [], orig: null };
+      drawOverlayShape(x, y, e.shiftKey);
       return;
     }
 
     st.beginStroke();
-    drag.current = { drawing: true, startX: x, startY: y, erase };
-    applyPaint(x, y, erase);
+    // snapshot grátis: paint() é imutável, então a referência congela o pré-traço
+    drag.current = { drawing: true, startX: x, startY: y, erase, lastX: x, lastY: y, lastKey: '', trail: [], orig: frame.cells };
+    applyStrokeTo(x, y, erase);
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
@@ -181,10 +226,10 @@ export default function PixelCanvas() {
     const st = useStudio.getState();
     const [x, y] = cell;
     if (st.tool === 'line' || st.tool === 'rect' || st.tool === 'ellipse') {
-      drawOverlayShape(x, y);
+      drawOverlayShape(x, y, e.shiftKey);
       return;
     }
-    applyPaint(x, y, d.erase);
+    applyStrokeTo(x, y, d.erase);
   };
 
   const onPointerUp = (e: React.PointerEvent) => {

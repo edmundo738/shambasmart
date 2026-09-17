@@ -51,10 +51,21 @@ export function ellipsePoints(
   const pts: Array<[number, number]> = [];
   if (rx < 0 || ry < 0) return pts;
   const rxc = Math.max(rx, 0.5), ryc = Math.max(ry, 0.5);
-  for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++) {
-    for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++) {
-      const v = ((x - cx) / rxc) ** 2 + ((y - cy) / ryc) ** 2;
-      if (filled ? v <= 1 : v <= 1 && v > 0.72) pts.push([x, y]);
+  const inside = (x: number, y: number) =>
+    ((x - cx) / rxc) ** 2 + ((y - cy) / ryc) ** 2 <= 1;
+  const x0 = Math.floor(cx - rx), x1 = Math.ceil(cx + rx);
+  const y0 = Math.floor(cy - ry), y1 = Math.ceil(cy + ry);
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      if (!inside(x, y)) continue;
+      if (filled) {
+        pts.push([x, y]);
+        continue;
+      }
+      // contorno = ponto cheio com ao menos um vizinho-4 fora (anel 1px conexo)
+      if (!inside(x + 1, y) || !inside(x - 1, y) || !inside(x, y + 1) || !inside(x, y - 1)) {
+        pts.push([x, y]);
+      }
     }
   }
   return pts;
@@ -103,6 +114,45 @@ export function mirrorPoints(
   const out: Array<[number, number]> = [];
   for (const yy of ys) for (const xx of xs) out.push([xx, yy]);
   return out;
+}
+
+export interface PpStep {
+  /** trilha atualizada (pontos considerados pintados no traço) */
+  trail: Array<[number, number]>;
+  /** pontos novos a pintar */
+  paint: Array<[number, number]>;
+  /** cantos a restaurar à cor original (pintados antes neste traço) */
+  unpaint: Array<[number, number]>;
+}
+
+/**
+ * Passo pixel-perfect estilo Aseprite, para pincel 1px sem espelho.
+ * Se os dois últimos pontos + `next` formarem um canto perpendicular (L),
+ * o canto sai da pintura (evita o "degrau duplo" das diagonais).
+ * Puro e determinístico — o chamador restaura `unpaint` com a cor pré-traço.
+ */
+export function pixelPerfectStep(
+  trail: Array<[number, number]>, next: [number, number],
+): PpStep {
+  const n = trail.length;
+  if (!n) return { trail: [next], paint: [next], unpaint: [] };
+  const last = trail[n - 1];
+  if (last[0] === next[0] && last[1] === next[1]) {
+    return { trail, paint: [], unpaint: [] };
+  }
+  if (n < 2) return { trail: [...trail, next], paint: [next], unpaint: [] };
+  const prev = trail[n - 2];
+  const dx1 = last[0] - prev[0];
+  const dy1 = last[1] - prev[1];
+  const dx2 = next[0] - last[0];
+  const dy2 = next[1] - last[1];
+  const unit1 = Math.abs(dx1) + Math.abs(dy1) === 1;
+  const unit2 = Math.abs(dx2) + Math.abs(dy2) === 1;
+  const perpendicular = dx1 * dx2 + dy1 * dy2 === 0;
+  if (unit1 && unit2 && perpendicular) {
+    return { trail: [...trail.slice(0, -1), next], paint: [next], unpaint: [last] };
+  }
+  return { trail: [...trail, next], paint: [next], unpaint: [] };
 }
 
 /** Conta cores usadas ordenadas por frequência */

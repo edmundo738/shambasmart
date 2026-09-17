@@ -115,7 +115,9 @@ export default function Studio() {
         case 'l': st.setTool('line'); break;
         case 'r': st.setTool('rect'); break;
         case 'o': st.setTool('ellipse'); break;
+        case 'p': st.togglePixelPerfect(); break;
         case 'x': st.toggleMirrorX(); break;
+        case 'y': st.toggleMirrorY(); break;
         case '[': st.setBrushSize(st.brushSize - 1); break;
         case ']': st.setBrushSize(st.brushSize + 1); break;
         case ' ': {
