@@ -81,6 +81,7 @@ interface StudioState {
   renameAnimation: (id: string, name: string) => void;
   deleteAnimation: (id: string) => void;
   duplicateAnimation: (id: string) => void;
+  addAnimationWithFrames: (name: string, fps: number, framesCells: string[][]) => void;
   setAnimFps: (id: string, fps: number) => void;
 
   // variações
@@ -376,6 +377,28 @@ export const useStudio = create<StudioState>((set, get) => ({
       return copy.id;
     });
     const anim: Animation = { id: uid('an'), name: `${src.name}_copia`, fps: src.fps, frameIds };
+    return {
+      ...hist,
+      project: { ...s.project, frames, animations: [...s.project.animations, anim], updatedAt: Date.now() },
+      currentAnimationId: anim.id,
+      currentFrameId: frameIds[0] ?? null,
+    };
+  }),
+
+  addAnimationWithFrames: (name, fps, framesCells) => set((s) => {
+    if (!s.project || !framesCells.length) return {};
+    const hist = pushHistory(s);
+    const frames = { ...s.project.frames };
+    const frameIds = framesCells.map((cells) => {
+      const f: Frame = { id: uid('fr'), cells: [...cells] };
+      frames[f.id] = f;
+      return f.id;
+    });
+    const existing = new Set(s.project.animations.map((a) => a.name));
+    let finalName = name.trim().slice(0, 24) || 'auto';
+    let k = 2;
+    while (existing.has(finalName)) finalName = `${name.trim().slice(0, 20)}_${k++}`;
+    const anim: Animation = { id: uid('an'), name: finalName, fps: Math.max(1, Math.min(60, fps)), frameIds };
     return {
       ...hist,
       project: { ...s.project, frames, animations: [...s.project.animations, anim], updatedAt: Date.now() },

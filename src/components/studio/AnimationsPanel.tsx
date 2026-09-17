@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import { Clapperboard, Copy, Plus, Trash2 } from 'lucide-react';
+import { Clapperboard, Copy, Plus, Trash2, Wand2 } from 'lucide-react';
 import { useStudio } from '../../store/studio';
+import ProceduralMotionModal from './ProceduralMotionModal';
 
 const SUGGESTIONS = ['idle', 'andar', 'correr', 'pular', 'cair', 'ataque', 'dano', 'morte', 'defesa', 'coletar', 'voar', 'nadar'];
 
 export default function AnimationsPanel() {
   const project = useStudio((s) => s.project);
   const currentAnimationId = useStudio((s) => s.currentAnimationId);
+  const currentFrameId = useStudio((s) => s.currentFrameId);
   const select = useStudio((s) => s.select);
   const addAnimation = useStudio((s) => s.addAnimation);
   const renameAnimation = useStudio((s) => s.renameAnimation);
@@ -14,12 +16,14 @@ export default function AnimationsPanel() {
   const duplicateAnimation = useStudio((s) => s.duplicateAnimation);
   const setAnimFps = useStudio((s) => s.setAnimFps);
   const [editing, setEditing] = useState<string | null>(null);
+  const [motionOpen, setMotionOpen] = useState(false);
   const [draft, setDraft] = useState('');
 
   if (!project) return null;
 
   return (
     <div className="flex flex-col gap-2">
+      {motionOpen && <ProceduralMotionModal onClose={() => setMotionOpen(false)} />}
       <p className="text-[11px] leading-relaxed text-slate-500">
         Cada <strong className="text-slate-300">ação</strong> tem sua própria sequência de frames. As variações se aplicam a todas de uma vez.
       </p>
@@ -87,6 +91,14 @@ export default function AnimationsPanel() {
         className="flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-ink-600 py-2 text-sm font-medium text-slate-400 hover:border-pixel-500 hover:text-pixel-400"
       >
         <Plus size={15} /> Nova ação
+      </button>
+      <button
+        onClick={() => setMotionOpen(true)}
+        disabled={!currentFrameId}
+        title="Gerar animação procedural a partir do frame atual"
+        className="flex items-center justify-center gap-2 rounded-lg border border-ember-400/40 bg-ember-500/10 py-2 text-sm font-semibold text-ember-400 hover:bg-ember-500/20 disabled:opacity-40"
+      >
+        <Wand2 size={15} /> Auto-movimento
       </button>
 
       <div>
