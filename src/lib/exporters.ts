@@ -1,7 +1,8 @@
 import { GIFEncoder, quantize, applyPalette } from 'gifenc';
 import JSZip from 'jszip';
 import {
-  Animation, EnginePreset, Frame, ORIGINAL_VARIATION_ID, PlayMode, ProjectData, Variation,
+  Animation, EnginePreset, Frame, FrameAnchor, FrameHitbox, ORIGINAL_VARIATION_ID, PlayMode, ProjectData,
+  Variation,
 } from '../types';
 import { applyVariationToColor } from './color';
 import { compositeStack } from './layers';
@@ -157,8 +158,10 @@ export function buildMetadata(
   layers: Array<{ name: string; visible: boolean; opacity: number }> = [],
   durationsMs: number[] = [],
   playMode: PlayMode = 'loop',
+  metas: Array<{ anchors: FrameAnchor[]; hitbox: FrameHitbox | null }> = [],
 ): object {
   const dur = (i: number) => clampMs(durationsMs[i] ?? fpsToMs(fps));
+  const meta = (i: number) => ({ anchors: metas[i]?.anchors ?? [], hitbox: metas[i]?.hitbox ?? null });
   switch (engine) {
     case 'phaser': {
       const frames: Record<string, object> = {};
@@ -166,6 +169,7 @@ export function buildMetadata(
         const r = rects[i];
         frames[n] = {
           durationMs: dur(i),
+          ...meta(i),
           frame: { x: r.x, y: r.y, w: r.w, h: r.h },
           rotated: false,
           trimmed: false,
@@ -180,25 +184,25 @@ export function buildMetadata(
     }
     case 'unity': {
       return {
-        frames: names.map((n, i) => ({ name: n, fps, durationMs: dur(i), rect: { ...rects[i] } })),
+        frames: names.map((n, i) => ({ name: n, fps, durationMs: dur(i), ...meta(i), rect: { ...rects[i] } })),
         meta: { app: 'PixelForge Studio', image: imageFile, sheetSize: { w: sheetW, h: sheetH }, note: 'Importe como Sprite (Multiple) e fatie pela grade, ou use estes rects.', playMode, layers },
       };
     }
     case 'godot': {
       return {
-        frames: names.map((n, i) => ({ name: n, durationMs: dur(i), ...rects[i] })),
+        frames: names.map((n, i) => ({ name: n, durationMs: dur(i), ...meta(i), ...rects[i] })),
         meta: { app: 'PixelForge Studio', image: imageFile, sheetSize: { w: sheetW, h: sheetH }, fps, note: 'Use AtlasTexture com estes region rects, ou AnimatedSprite2D com SpriteFrames.', playMode, layers },
       };
     }
     case 'gamemaker': {
       return {
-        frames: names.map((n, i) => ({ name: n, durationMs: dur(i), ...rects[i] })),
+        frames: names.map((n, i) => ({ name: n, durationMs: dur(i), ...meta(i), ...rects[i] })),
         meta: { app: 'PixelForge Studio', image: imageFile, fps, note: 'Importe a strip na ordem dos frames (esquerda -> direita, cima -> baixo).', playMode, layers },
       };
     }
     default: {
       return {
-        frames: names.map((n, i) => ({ name: n, durationMs: dur(i), ...rects[i] })),
+        frames: names.map((n, i) => ({ name: n, durationMs: dur(i), ...meta(i), ...rects[i] })),
         meta: { app: 'PixelForge Studio', image: imageFile, sheetSize: { w: sheetW, h: sheetH }, frameSize: { w: frameW, h: frameH }, fps, playMode, layers },
       };
     }
@@ -315,6 +319,7 @@ export async function buildPackZip(project: ProjectData, opts: PackOpts): Promis
             project.layers.map((l) => ({ name: l.name, visible: l.visible, opacity: l.opacity })),
             durationsOf(anim, project.frames),
             anim.playMode ?? 'loop',
+            frames.map((f) => ({ anchors: f.anchors ?? [], hitbox: f.hitbox ?? null })),
           );
           folder.file(`${base}.json`, JSON.stringify(meta, null, 2));
         }

@@ -1,5 +1,5 @@
 import {
-  BoxSelect, Brush, Circle, Crosshair, Eraser, FlipHorizontal2, FlipVertical2, Ghost, Grid3x3, PaintBucket, Pipette,
+  Anchor, BoxSelect, Brush, Circle, Crosshair, Eraser, FlipHorizontal2, FlipVertical2, Ghost, Grid3x3, PaintBucket, Pipette,
   Slash, Square,
 } from 'lucide-react';
 import { useStudio } from '../../store/studio';
@@ -11,6 +11,7 @@ const TOOLS: Array<{ id: ToolId; icon: React.ReactNode; label: string; hint: str
   { id: 'fill', icon: <PaintBucket size={18} />, label: 'Balde', hint: 'G' },
   { id: 'picker', icon: <Pipette size={18} />, label: 'Conta-gotas', hint: 'I' },
   { id: 'select', icon: <BoxSelect size={18} />, label: 'Selecionar', hint: 'M' },
+  { id: 'meta', icon: <Anchor size={18} />, label: 'Âncoras', hint: 'T' },
   { id: 'line', icon: <Slash size={18} />, label: 'Linha', hint: 'L' },
   { id: 'rect', icon: <Square size={18} />, label: 'Retângulo', hint: 'R' },
   { id: 'ellipse', icon: <Circle size={18} />, label: 'Elipse', hint: 'O' },

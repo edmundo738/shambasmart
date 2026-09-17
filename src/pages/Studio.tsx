@@ -14,6 +14,7 @@ import PreviewPanel from '../components/studio/PreviewPanel';
 import RecipeCard from '../components/studio/RecipeCard';
 import MasterPanel from '../components/studio/MasterPanel';
 import LayersPanel from '../components/studio/LayersPanel';
+import MetaPanel from '../components/studio/MetaPanel';
 import ExportModal from '../components/studio/ExportModal';
 import { TEMPLATES } from '../lib/templates';
 
@@ -131,6 +132,7 @@ export default function Studio() {
         case 'r': st.setTool('rect'); break;
         case 'o': st.setTool('ellipse'); break;
         case 'm': st.setTool('select'); break;
+        case 't': st.setTool('meta'); break;
         case 'p': st.togglePixelPerfect(); break;
         case 'x': st.toggleMirrorX(); break;
         case 'y': st.toggleMirrorY(); break;
@@ -244,7 +246,7 @@ export default function Studio() {
               </button>
             </div>
             <div className="absolute right-3 top-3 hidden rounded-lg border border-ink-700 bg-ink-950/80 px-2.5 py-1.5 font-mono text-[10px] leading-relaxed text-slate-500 xl:block">
-              <div><kbd className="text-slate-300">B E G I M L R O</kbd> ferramentas</div>
+              <div><kbd className="text-slate-300">B E G I M T L R O</kbd> ferramentas</div>
               <div><kbd className="text-slate-300">Espaço</kbd> play · <kbd className="text-slate-300">←→</kbd> frames</div>
               <div><kbd className="text-slate-300">Ctrl+C/X/V</kbd> copiar/colar frame</div>
               <div><kbd className="text-slate-300">Ctrl+Z</kbd> desfazer · <kbd className="text-slate-300">Alt+clique</kbd> cor</div>
@@ -256,6 +258,7 @@ export default function Studio() {
         {/* painel direito */}
         <aside className="thin-scroll flex w-full shrink-0 flex-col gap-3 overflow-y-auto lg:w-80">
           <LayersPanel />
+          <MetaPanel />
           <PreviewPanel />
           <RecipeCard />
           <MasterPanel />

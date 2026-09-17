@@ -1,5 +1,6 @@
-import { DEFAULT_FRAME_MS, Frame, Layer, PlayMode, ProjectData, uid } from '../types';
+import { DEFAULT_FRAME_MS, Frame, FrameAnchor, FrameHitbox, Layer, PlayMode, ProjectData, uid } from '../types';
 import { clampMs, fpsToMs } from './timeline';
+import { clampAnchor, normalizeHitbox } from './frameMeta';
 import { emptyCells } from './pixels';
 
 /**
@@ -12,7 +13,7 @@ export function createLayer(name: string, opacity = 100): Layer {
 }
 
 export function makeFrame(layerId: string, cells: string[], durationMs = DEFAULT_FRAME_MS): Frame {
-  return { id: uid('fr'), cels: { [layerId]: cells }, durationMs: clampMs(durationMs) };
+  return { id: uid('fr'), cels: { [layerId]: cells }, durationMs: clampMs(durationMs), anchors: [], hitbox: null };
 }
 
 export function layerById(project: ProjectData, id: string | null): Layer | undefined {
@@ -84,7 +85,10 @@ export function flattenCells(project: ProjectData, frame: Frame): string[] {
 export function migrateProject(p: ProjectData): ProjectData {
   const raw = p as unknown as {
     layers?: Layer[];
-    frames: Record<string, { id: string; cels?: Record<string, string[]>; cells?: string[]; durationMs?: number }>;
+    frames: Record<string, {
+      id: string; cels?: Record<string, string[]>; cells?: string[]; durationMs?: number;
+      anchors?: FrameAnchor[]; hitbox?: FrameHitbox | null;
+    }>;
   };
   // fps da primeira ação que contém o frame -> preserva o timing de projetos legados
   const fpsOf = new Map<string, number>();
@@ -95,6 +99,26 @@ export function migrateProject(p: ProjectData): ProjectData {
   }
   const legacyMs = (id: string, v: number | undefined) =>
     typeof v === 'number' ? clampMs(v) : fpsOf.has(id) ? fpsToMs(fpsOf.get(id)!) : DEFAULT_FRAME_MS;
+  const legacyMeta = (f: { anchors?: unknown; hitbox?: unknown }) => {
+    const anchors: FrameAnchor[] = [];
+    if (Array.isArray(f.anchors)) {
+      for (const a of f.anchors as FrameAnchor[]) {
+        if (!a || typeof a !== 'object') continue;
+        anchors.push(clampAnchor({
+          id: typeof a.id === 'string' && a.id ? a.id : uid('an'),
+          name: typeof a.name === 'string' && a.name ? a.name.slice(0, 24) : 'ponto',
+          x: a.x, y: a.y,
+        }, p.width, p.height));
+      }
+    }
+    const hb = f.hitbox as FrameHitbox | null | undefined;
+    const hitbox = hb && typeof hb === 'object' ? normalizeHitbox(hb, p.width, p.height) : null;
+    return { anchors, hitbox };
+  };
+  const metaDirty = (f: { anchors?: unknown; hitbox?: unknown }, meta: { anchors: FrameAnchor[]; hitbox: FrameHitbox | null }) =>
+    f.anchors === undefined || f.hitbox === undefined
+    || JSON.stringify(f.anchors) !== JSON.stringify(meta.anchors)
+    || JSON.stringify(f.hitbox ?? null) !== JSON.stringify(meta.hitbox);
   let animsChanged = false;
   const animations = (p.animations ?? []).map((a) => {
     const mode = (a as { playMode?: PlayMode }).playMode;
@@ -107,11 +131,12 @@ export function migrateProject(p: ProjectData): ProjectData {
     const frames: Record<string, Frame> = {};
     for (const [id, f] of Object.entries(raw.frames)) {
       if (f.cels) {
-        const ensured = ensureFrameCels({ ...p, layers: raw.layers }, { id, cels: f.cels, durationMs: legacyMs(id, f.durationMs) });
+        const meta = legacyMeta(f);
+        const ensured = ensureFrameCels({ ...p, layers: raw.layers }, { id, cels: f.cels, durationMs: legacyMs(id, f.durationMs), ...meta });
         frames[id] = ensured;
-        if (ensured.cels !== f.cels || f.durationMs === undefined) changed = true;
+        if (ensured.cels !== f.cels || f.durationMs === undefined || metaDirty(f, meta)) changed = true;
       } else {
-        frames[id] = { id, cels: { [raw.layers[0].id]: f.cells ?? emptyCells(p.width, p.height) }, durationMs: legacyMs(id, f.durationMs) };
+        frames[id] = { id, cels: { [raw.layers[0].id]: f.cells ?? emptyCells(p.width, p.height) }, durationMs: legacyMs(id, f.durationMs), ...legacyMeta(f) };
         changed = true;
       }
     }
@@ -125,6 +150,7 @@ export function migrateProject(p: ProjectData): ProjectData {
       id,
       cels: { [layer.id]: f.cels ? (Object.values(f.cels)[0] ?? emptyCells(p.width, p.height)) : (f.cells ?? emptyCells(p.width, p.height)) },
       durationMs: legacyMs(id, f.durationMs),
+      ...legacyMeta(f),
     };
   }
   return { ...p, layers: [layer], frames, animations };

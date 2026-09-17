@@ -115,7 +115,7 @@ describe('migrateProject', () => {
   });
   it('projeto novo passa intacto', () => {
     const l = createLayer('x');
-    const p = proj([l], { fr1: { id: 'fr1', cels: { [l.id]: emptyCells(4, 4) }, durationMs: 100 } });
+    const p = proj([l], { fr1: { id: 'fr1', cels: { [l.id]: emptyCells(4, 4) }, durationMs: 100, anchors: [], hitbox: null } });
     expect(migrateProject(p)).toBe(p);
   });
 });

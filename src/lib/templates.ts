@@ -30,7 +30,7 @@ class Painter {
     }
   }
   frame(layerId: string): Frame {
-    return { id: uid('fr'), cels: { [layerId]: [...this.cells] }, durationMs: DEFAULT_FRAME_MS };
+    return { id: uid('fr'), cels: { [layerId]: [...this.cells] }, durationMs: DEFAULT_FRAME_MS, anchors: [], hitbox: null };
   }
   clear() {
     this.cells = emptyCells(W, H);

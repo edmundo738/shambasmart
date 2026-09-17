@@ -10,12 +10,32 @@ export interface Layer {
   opacity: number;
 }
 
+/** Ponto nomeado no frame (pivô, mão, ponta da arma...): coordenadas inteiras de pixel. */
+export interface FrameAnchor {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+}
+
+/** Caixa de colisão do frame: origem + tamanho em pixels (w/h >= 1). */
+export interface FrameHitbox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface Frame {
   id: string;
   /** cel por layer: layerId -> pixels (frame × layer = cel) */
   cels: Record<string, Cell[]>;
   /** duração do frame em ms — fonte da verdade do timing (playback, preview, GIF) */
   durationMs: number;
+  /** âncoras do frame (vazio = sem pontos) */
+  anchors: FrameAnchor[];
+  /** hitbox do frame (null = sem colisão) */
+  hitbox: FrameHitbox | null;
 }
 
 /** Timing padrão (100ms = 10fps) e limites do editor. */
@@ -75,7 +95,7 @@ export interface ProjectData {
   updatedAt: number;
 }
 
-export type ToolId = 'brush' | 'eraser' | 'fill' | 'picker' | 'line' | 'rect' | 'ellipse' | 'select';
+export type ToolId = 'brush' | 'eraser' | 'fill' | 'picker' | 'line' | 'rect' | 'ellipse' | 'select' | 'meta';
 
 /** Seleção retangular (coordenadas inclusivas, normalizadas: x0<=x1, y0<=y1). */
 export interface SelRect {

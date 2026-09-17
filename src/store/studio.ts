@@ -1,10 +1,12 @@
 import { create } from 'zustand';
 import {
-  Animation, Frame, Layer, ORIGINAL_VARIATION_ID, PlayMode, ProjectData, SelRect, ToolId, Variation, uid,
+  Animation, Frame, FrameAnchor, FrameHitbox, Layer, ORIGINAL_VARIATION_ID, PlayMode, ProjectData, SelRect,
+  ToolId, Variation, uid,
 } from '../types';
 import { emptyCells, moveRect } from '../lib/pixels';
 import { clampMs, fpsToMs, frameMs, moveIdTo } from '../lib/timeline';
-import { createLayer, makeFrame, migrateProject } from '../lib/layers';
+import { clampAnchor, cloneFrameMeta, normalizeHitbox, opaqueBBox } from '../lib/frameMeta';
+import { createLayer, flattenCells, makeFrame, migrateProject } from '../lib/layers';
 import { normalizeHex } from '../lib/color';
 import { TEMPLATES } from '../lib/templates';
 
@@ -128,6 +130,19 @@ interface StudioState {
   copyFrame: (id: string) => void;
   cutFrame: (id: string) => void;
   pasteFrame: () => void;
+
+  // âncoras + hitbox (frame atual)
+  addAnchor: (name?: string) => void;
+  addAnchorAt: (x: number, y: number, name?: string) => void;
+  renameAnchor: (anchorId: string, name: string) => void;
+  moveAnchor: (anchorId: string, x: number, y: number) => void;
+  moveAnchorLive: (anchorId: string, x: number, y: number) => void;
+  deleteAnchor: (anchorId: string) => void;
+  setHitbox: (box: FrameHitbox | null) => void;
+  setHitboxLive: (box: FrameHitbox | null) => void;
+  autoFitHitbox: () => void;
+  showMeta: boolean;
+  toggleShowMeta: () => void;
   clearFrame: (id: string) => void;
 
   // animações
@@ -195,6 +210,24 @@ function applyMove(
   };
 }
 
+function patchFrameMeta(
+  project: ProjectData, frameId: string,
+  patch: { anchors?: FrameAnchor[]; hitbox?: FrameHitbox | null },
+  hist: Partial<StudioState>,
+): Partial<StudioState> {
+  const frame = project.frames[frameId];
+  if (!frame) return {};
+  return {
+    ...hist,
+    project: {
+      ...project,
+      frames: { ...project.frames, [frameId]: { ...frame, ...patch } },
+      updatedAt: Date.now(),
+    },
+    dirty: true,
+  };
+}
+
 function currentAnim(project: ProjectData, animId: string | null): Animation | undefined {
   return project.animations.find((a) => a.id === animId) ?? project.animations[0];
 }
@@ -234,6 +267,7 @@ export const useStudio = create<StudioState>((set, get) => ({
   onionOpacity: 32,
   onionTintPrev: '#ff4d6d',
   onionTintNext: '#22b8f0',
+  showMeta: true,
   zoom: 12,
   playing: true,
   currentAnimationId: null,
@@ -309,6 +343,7 @@ export const useStudio = create<StudioState>((set, get) => ({
   toggleMirrorY: () => set((s) => ({ mirrorY: !s.mirrorY })),
   toggleGrid: () => set((s) => ({ showGrid: !s.showGrid })),
   toggleOnion: () => set((s) => ({ onionSkin: !s.onionSkin })),
+  toggleShowMeta: () => set((s) => ({ showMeta: !s.showMeta })),
   setOnionPrev: (n) => set({ onionPrev: Math.max(0, Math.min(3, Math.round(n))) }),
   setOnionNext: (n) => set({ onionNext: Math.max(0, Math.min(3, Math.round(n))) }),
   setOnionOpacity: (n) => set({ onionOpacity: Math.max(5, Math.min(80, Math.round(n))) }),
@@ -521,7 +556,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     const anim = currentAnim(s.project, s.currentAnimationId);
     if (!anim) return {};
     const hist = pushHistory(s);
-    const frame: Frame = { id: uid('fr'), cels: emptyCels(s.project), durationMs: fpsToMs(anim.fps) };
+    const frame: Frame = { id: uid('fr'), cels: emptyCels(s.project), durationMs: fpsToMs(anim.fps), anchors: [], hitbox: null };
     const curIdx = s.currentFrameId ? anim.frameIds.indexOf(s.currentFrameId) : anim.frameIds.length - 1;
     const frameIds = [...anim.frameIds];
     frameIds.splice(curIdx + 1, 0, frame.id);
@@ -544,7 +579,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     const src = s.project.frames[id];
     if (!anim || !src || !anim.frameIds.includes(id)) return {};
     const hist = pushHistory(s);
-    const frame: Frame = { id: uid('fr'), cels: cloneCels(src, s.project), durationMs: frameMs(src) };
+    const frame: Frame = { id: uid('fr'), cels: cloneCels(src, s.project), durationMs: frameMs(src), ...cloneFrameMeta(src) };
     const frameIds = [...anim.frameIds];
     frameIds.splice(frameIds.indexOf(id) + 1, 0, frame.id);
     const animations = s.project.animations.map((a) => (a.id === anim.id ? { ...a, frameIds } : a));
@@ -660,7 +695,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     const frameIds = [...anim.frameIds];
     const curIdx = s.currentFrameId ? frameIds.indexOf(s.currentFrameId) : frameIds.length - 1;
     const pasted = s.frameClipboard.map((f) => {
-      const copy: Frame = { id: uid('fr'), cels: cloneCels(f, s.project!), durationMs: frameMs(f) };
+      const copy: Frame = { id: uid('fr'), cels: cloneCels(f, s.project!), durationMs: frameMs(f), ...cloneFrameMeta(f) };
       frames[copy.id] = copy;
       return copy.id;
     });
@@ -671,6 +706,97 @@ export const useStudio = create<StudioState>((set, get) => ({
       project: { ...s.project, frames, animations, updatedAt: Date.now() },
       currentFrameId: pasted[0],
     };
+  }),
+
+  addAnchor: (name) => {
+    const s = get();
+    if (!s.project) return;
+    get().addAnchorAt(Math.floor(s.project.width / 2), Math.floor(s.project.height / 2), name);
+  },
+
+  addAnchorAt: (x, y, name) => set((s) => {
+    if (!s.project) return {};
+    const frame = s.project.frames[s.currentFrameId ?? ''];
+    if (!frame) return {};
+    const hist = pushHistory(s);
+    const n = frame.anchors.length + 1;
+    const anchor = clampAnchor({
+      id: uid('an'),
+      name: (name?.trim() || `ponto_${n}`).slice(0, 24),
+      x, y,
+    }, s.project.width, s.project.height);
+    return patchFrameMeta(s.project, frame.id, { anchors: [...frame.anchors, anchor] }, hist);
+  }),
+
+  renameAnchor: (anchorId, name) => set((s) => {
+    if (!s.project || !name.trim()) return {};
+    const frame = s.project.frames[s.currentFrameId ?? ''];
+    if (!frame || !frame.anchors.some((a) => a.id === anchorId)) return {};
+    const hist = pushHistory(s);
+    return patchFrameMeta(s.project, frame.id, {
+      anchors: frame.anchors.map((a) => (a.id === anchorId ? { ...a, name: name.trim().slice(0, 24) } : a)),
+    }, hist);
+  }),
+
+  moveAnchor: (anchorId, x, y) => set((s) => {
+    if (!s.project) return {};
+    const frame = s.project.frames[s.currentFrameId ?? ''];
+    const cur = frame?.anchors.find((a) => a.id === anchorId);
+    if (!frame || !cur) return {};
+    const next = clampAnchor({ ...cur, x, y }, s.project.width, s.project.height);
+    if (next.x === cur.x && next.y === cur.y) return {};
+    return patchFrameMeta(s.project, frame.id, {
+      anchors: frame.anchors.map((a) => (a.id === anchorId ? next : a)),
+    }, pushHistory(s));
+  }),
+
+  moveAnchorLive: (anchorId, x, y) => set((s) => {
+    if (!s.project) return {};
+    const frame = s.project.frames[s.currentFrameId ?? ''];
+    const cur = frame?.anchors.find((a) => a.id === anchorId);
+    if (!frame || !cur) return {};
+    const next = clampAnchor({ ...cur, x, y }, s.project.width, s.project.height);
+    if (next.x === cur.x && next.y === cur.y) return {};
+    return patchFrameMeta(s.project, frame.id, {
+      anchors: frame.anchors.map((a) => (a.id === anchorId ? next : a)),
+    }, {});
+  }),
+
+  deleteAnchor: (anchorId) => set((s) => {
+    if (!s.project) return {};
+    const frame = s.project.frames[s.currentFrameId ?? ''];
+    if (!frame || !frame.anchors.some((a) => a.id === anchorId)) return {};
+    return patchFrameMeta(s.project, frame.id, {
+      anchors: frame.anchors.filter((a) => a.id !== anchorId),
+    }, pushHistory(s));
+  }),
+
+  setHitbox: (box) => set((s) => {
+    if (!s.project) return {};
+    const frame = s.project.frames[s.currentFrameId ?? ''];
+    if (!frame) return {};
+    const next = box ? normalizeHitbox(box, s.project.width, s.project.height) : null;
+    if (JSON.stringify(frame.hitbox ?? null) === JSON.stringify(next)) return {};
+    return patchFrameMeta(s.project, frame.id, { hitbox: next }, pushHistory(s));
+  }),
+
+  setHitboxLive: (box) => set((s) => {
+    if (!s.project) return {};
+    const frame = s.project.frames[s.currentFrameId ?? ''];
+    if (!frame) return {};
+    const next = box ? normalizeHitbox(box, s.project.width, s.project.height) : null;
+    if (JSON.stringify(frame.hitbox ?? null) === JSON.stringify(next)) return {};
+    return patchFrameMeta(s.project, frame.id, { hitbox: next }, {});
+  }),
+
+  autoFitHitbox: () => set((s) => {
+    if (!s.project) return {};
+    const frame = s.project.frames[s.currentFrameId ?? ''];
+    if (!frame) return {};
+    const box = opaqueBBox(flattenCells(s.project, frame), s.project.width, s.project.height);
+    if (!box) return {}; // frame vazio: nada a ajustar
+    if (JSON.stringify(frame.hitbox ?? null) === JSON.stringify(box)) return {};
+    return patchFrameMeta(s.project, frame.id, { hitbox: box }, pushHistory(s));
   }),
 
   clearFrame: (id) => set((s) => {
@@ -693,7 +819,7 @@ export const useStudio = create<StudioState>((set, get) => ({
   addAnimation: (name) => set((s) => {
     if (!s.project) return {};
     const hist = pushHistory(s);
-    const frame: Frame = { id: uid('fr'), cels: emptyCels(s.project), durationMs: fpsToMs(8) };
+    const frame: Frame = { id: uid('fr'), cels: emptyCels(s.project), durationMs: fpsToMs(8), anchors: [], hitbox: null };
     const count = s.project.animations.length + 1;
     const anim: Animation = { id: uid('an'), name: name || `acao_${count}`, fps: 8, frameIds: [frame.id], playMode: 'loop' };
     return {
@@ -747,7 +873,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     const frames = { ...s.project.frames };
     const frameIds = src.frameIds.map((fid) => {
       const f = frames[fid];
-      const copy: Frame = { id: uid('fr'), cels: cloneCels(f, s.project!), durationMs: frameMs(f) };
+      const copy: Frame = { id: uid('fr'), cels: cloneCels(f, s.project!), durationMs: frameMs(f), ...cloneFrameMeta(f) };
       frames[copy.id] = copy;
       return copy.id;
     });
@@ -770,7 +896,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     const frameIds = framesCells.map((cells) => {
       const cels = emptyCels(s.project!);
       if (target) cels[target.id] = [...cells];
-      const f: Frame = { id: uid('fr'), cels, durationMs: fpsToMs(fps) };
+      const f: Frame = { id: uid('fr'), cels, durationMs: fpsToMs(fps), anchors: [], hitbox: null };
       frames[f.id] = f;
       return f.id;
     });

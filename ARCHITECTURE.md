@@ -122,8 +122,9 @@ obrigatório em `docs/BENCHMARK.md` (referência × atual × alvo por sistema).
   drag-reorder, step, FPS base carimba todos, playback/export por duração (74 testes)
 - [x] **FASE C2 — Playback**: ping-pong/reverso por ação, onion prev/next configurável,
   preview 1x, GIF/metas ouvem o modo (81 testes)
-- [ ] **FASE D — Rig**: bones editáveis (FK correto, coordenadas local/pai/mundo),
-  render pixel-snapped, anchors/hitboxes no export
+- [x] **FASE D1 — Âncoras/hitbox**: pontos + colisão por frame, ferramenta T, overlay,
+  MetaPanel, auto-fit, export JSON por frame (94 testes)
+- [ ] **FASE D2 — Bones/FK**: esqueleto-guia editável (local/pai/mundo), render pixel-snapped
 - [ ] **FASE E — IK**: two-bone + FABRIK estável com limites, foot/hand targets
 - [ ] **FASE F — Motion**: 6 movimentos (idle/walk/run/jump/attack/hurt) com princípios
   de animação + curvas + retargeting entre proporções + edição pós-geração

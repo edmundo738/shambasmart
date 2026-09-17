@@ -223,3 +223,15 @@ Legenda de status: ✅ sólido · 🟡 funcional mas amador · 🔴 ausente/frá
 6. Preview 1x "tamanho do jogo"; JSON/pack.json trazem `playMode`.
 7. Dicas de atalho atualizadas (M, Ctrl+C/X/V).
 8. Testes: `timeline` +4, `store/timeline` +3 — suíte em 81/81.
+
+## Veredito FASE D1 (entregue)
+
+1. `Frame.anchors[]` + `Frame.hitbox` por frame (pixels inteiros, clampados ao canvas).
+2. `src/lib/frameMeta.ts`: clamp/normalize, `opaqueBBox`, `pointInHitbox`, `pickAnchor`, `cloneFrameMeta`.
+3. Migração preenche legados e saneia sujos (sem nome, fora do canvas, w/h 0); idempotente.
+4. Ferramenta Âncoras (`T`): clique cria, arrasto move; hitbox move pelo corpo, redimensiona pelo SE.
+5. Overlay: hitbox tracejada verde + alça, âncoras losango âmbar com nome; toggle por painel.
+6. `MetaPanel`: lista c/ renomear, numerics X/Y, hitbox X/Y/W/H, auto-fit pela bbox, tudo com undo.
+7. Arrasto = 1 undo (`beginStroke` + live); Esc reverte sem tocar na seleção de pixels.
+8. Duplicar/copiar/colar frames carregam metadados; JSONs de export trazem `anchors`+`hitbox` por frame.
+9. Testes: `frameMeta` (6) + `store/frameMeta` (6) — suíte em 94/94.

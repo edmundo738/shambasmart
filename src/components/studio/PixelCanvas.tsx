@@ -14,6 +14,7 @@ import {
   pixelPerfectStep, rectPoints,
 } from '../../lib/pixels';
 import { compositeStack, flattenCells } from '../../lib/layers';
+import { pickAnchor, pointInHitbox } from '../../lib/frameMeta';
 
 export default function PixelCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -22,7 +23,9 @@ export default function PixelCanvas() {
     drawing: boolean; startX: number; startY: number; erase: boolean;
     lastX: number; lastY: number; lastKey: string;
     trail: Array<[number, number]>; orig: string[] | null;
-    mode: 'paint' | 'shape' | 'marquee' | 'move'; moved: boolean; base: SelRect | null;
+    mode: 'paint' | 'shape' | 'marquee' | 'move' | 'anchor' | 'hitbox' | 'metadraw';
+    moved: boolean; base: SelRect | null;
+    anchorId: string | null; hbDX: number; hbDY: number; hbResize: boolean;
   } | null>(null);
 
   const project = useStudio((s) => s.project);
@@ -42,6 +45,7 @@ export default function PixelCanvas() {
   const onionTintNext = useStudio((s) => s.onionTintNext);
   const zoom = useStudio((s) => s.zoom);
   const selection = useStudio((s) => s.selection);
+  const showMeta = useStudio((s) => s.showMeta);
 
   const anim = project?.animations.find((a) => a.id === currentAnimationId) ?? project?.animations[0];
   const frame = currentFrameId ? project?.frames[currentFrameId] : undefined;
@@ -255,37 +259,98 @@ export default function PixelCanvas() {
     ctx.setLineDash([]);
   }, []);
 
-  /* Ants: estáticas sempre que há seleção; animadas com a ferramenta select. */
+  /** Metadados do frame atual: hitbox tracejada + âncoras com nome. */
+  const drawMeta = useCallback(() => {
+    const overlay = overlayRef.current;
+    const st = useStudio.getState();
+    const pr = st.project;
+    const f = st.currentFrameId ? pr?.frames[st.currentFrameId] : undefined;
+    if (!overlay || !pr || !f || !st.showMeta) return;
+    if (!overlay.width) {
+      overlay.width = pr.width * st.zoom;
+      overlay.height = pr.height * st.zoom;
+    }
+    const ctx = overlay.getContext('2d')!;
+    const z = st.zoom;
+    if (f.hitbox) {
+      const b = f.hitbox;
+      ctx.save();
+      ctx.strokeStyle = '#3fd65f';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 3]);
+      ctx.strokeRect(b.x * z + 0.5, b.y * z + 0.5, b.w * z - 1, b.h * z - 1);
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#3fd65f';
+      const hs = Math.max(5, Math.min(9, z));
+      ctx.fillRect((b.x + b.w) * z - hs, (b.y + b.h) * z - hs, hs, hs);
+      ctx.restore();
+    }
+    ctx.font = '10px monospace';
+    ctx.textBaseline = 'middle';
+    for (const a of f.anchors) {
+      const cx = (a.x + 0.5) * z, cy = (a.y + 0.5) * z;
+      const r = Math.max(3, z * 0.32);
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - r);
+      ctx.lineTo(cx + r, cy);
+      ctx.lineTo(cx, cy + r);
+      ctx.lineTo(cx - r, cy);
+      ctx.closePath();
+      ctx.fillStyle = '#ffd23f';
+      ctx.fill();
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = '#000';
+      ctx.stroke();
+      ctx.fillStyle = '#000';
+      ctx.fillRect(cx - 0.5, cy - 0.5, 1, 1);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+      ctx.strokeText(a.name, cx + r + 3, cy);
+      ctx.fillStyle = '#ffd23f';
+      ctx.fillText(a.name, cx + r + 3, cy);
+    }
+  }, []);
+
+  const drawDecor = useCallback(() => {
+    drawAnts(0);
+    drawMeta();
+  }, [drawAnts, drawMeta]);
+
+  /* Overlay: ants (+ meta) estáticas sempre; ants animadas com a ferramenta select. */
   useEffect(() => {
     if (!selection) {
-      if (!drag.current?.drawing) clearOverlay();
+      if (!drag.current?.drawing) {
+        clearOverlay();
+        drawMeta();
+      }
       return;
     }
-    drawAnts(0);
+    drawDecor();
     if (tool !== 'select') return;
     let off = 0;
-    const t = setInterval(() => { off = (off + 2) % 16; drawAnts(off); }, 120);
+    const t = setInterval(() => { off = (off + 2) % 16; drawAnts(off); drawMeta(); }, 120);
     return () => clearInterval(t);
-  }, [selection, zoom, tool, clearOverlay, drawAnts]);
+  }, [selection, zoom, tool, frame, showMeta, clearOverlay, drawAnts, drawMeta, drawDecor]);
 
   /* Esc durante marquee/arrasto: cancela (arrasto reverte pixels + retângulo). */
   useEffect(() => {
     const onEsc = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       const d = drag.current;
-      if (!d || (d.mode !== 'move' && d.mode !== 'marquee')) return;
+      if (!d || (d.mode !== 'move' && d.mode !== 'marquee' && d.mode !== 'anchor' && d.mode !== 'hitbox' && d.mode !== 'metadraw')) return;
       e.preventDefault();
       e.stopPropagation();
       const st = useStudio.getState();
-      if (d.mode === 'move' && d.moved) st.undo();
-      st.setSelection(d.base ? { ...d.base } : null);
+      if ((d.mode === 'move' || d.mode === 'anchor' || d.mode === 'hitbox') && d.moved) st.undo();
+      if (d.mode === 'move') st.setSelection(d.base ? { ...d.base } : null);
+      else if (d.mode === 'marquee') st.setSelection(null);
       drag.current = null;
       clearOverlay();
-      drawAnts(0);
+      drawDecor();
     };
     window.addEventListener('keydown', onEsc, true);
     return () => window.removeEventListener('keydown', onEsc, true);
-  }, [clearOverlay, drawAnts]);
+  }, [clearOverlay, drawDecor]);
 
   /* ------------------------------ interações ------------------------------ */
   const onPointerDown = (e: React.PointerEvent) => {
@@ -310,15 +375,54 @@ export default function PixelCanvas() {
         st.beginStroke(); // baseline: arrasto inteiro = 1 undo
         drag.current = {
           drawing: true, startX: x, startY: y, erase: false, lastX: x, lastY: y,
-          lastKey: '', trail: [], orig: null, mode: 'move', moved: false, base: { ...sel },
+          lastKey: '', trail: [], orig: null, mode: 'move', moved: false, base: { ...sel }, anchorId: null, hbDX: 0, hbDY: 0, hbResize: false,
         };
       } else {
         st.setSelection(null);
         drag.current = {
           drawing: true, startX: x, startY: y, erase: false, lastX: x, lastY: y,
-          lastKey: '', trail: [], orig: null, mode: 'marquee', moved: false, base: null,
+          lastKey: '', trail: [], orig: null, mode: 'marquee', moved: false, base: null, anchorId: null, hbDX: 0, hbDY: 0, hbResize: false,
         };
       }
+      return;
+    }
+
+    if (st.tool === 'meta') {
+      const hit = pickAnchor(frame.anchors ?? [], x, y);
+      if (hit) {
+        st.beginStroke();
+        drag.current = {
+          drawing: true, startX: x, startY: y, erase: false, lastX: x, lastY: y,
+          lastKey: '', trail: [], orig: null, mode: 'anchor', moved: false, base: null,
+          anchorId: hit.id, hbDX: 0, hbDY: 0, hbResize: false,
+        };
+        return;
+      }
+      const hb = frame.hitbox;
+      if (hb && Math.abs(x - (hb.x + hb.w - 1)) <= 1 && Math.abs(y - (hb.y + hb.h - 1)) <= 1) {
+        st.beginStroke(); // redimensiona pelo canto SE
+        drag.current = {
+          drawing: true, startX: x, startY: y, erase: false, lastX: x, lastY: y,
+          lastKey: '', trail: [], orig: null, mode: 'hitbox', moved: false, base: null,
+          anchorId: null, hbDX: 0, hbDY: 0, hbResize: true,
+        };
+        return;
+      }
+      if (hb && pointInHitbox(x, y, hb)) {
+        st.beginStroke(); // move a caixa
+        drag.current = {
+          drawing: true, startX: x, startY: y, erase: false, lastX: x, lastY: y,
+          lastKey: '', trail: [], orig: null, mode: 'hitbox', moved: false, base: null,
+          anchorId: null, hbDX: x - hb.x, hbDY: y - hb.y, hbResize: false,
+        };
+        return;
+      }
+      // vazio: clique cria âncora, arrasto desenha hitbox
+      drag.current = {
+        drawing: true, startX: x, startY: y, erase: false, lastX: x, lastY: y,
+        lastKey: '', trail: [], orig: null, mode: 'metadraw', moved: false, base: null,
+        anchorId: null, hbDX: 0, hbDY: 0, hbResize: false,
+      };
       return;
     }
 
@@ -338,14 +442,14 @@ export default function PixelCanvas() {
     }
 
     if (st.tool === 'line' || st.tool === 'rect' || st.tool === 'ellipse') {
-      drag.current = { drawing: true, startX: x, startY: y, erase, lastX: x, lastY: y, lastKey: '', trail: [], orig: null, mode: 'shape', moved: false, base: null };
+      drag.current = { drawing: true, startX: x, startY: y, erase, lastX: x, lastY: y, lastKey: '', trail: [], orig: null, mode: 'shape', moved: false, base: null, anchorId: null, hbDX: 0, hbDY: 0, hbResize: false };
       drawOverlayShape(x, y, e.shiftKey);
       return;
     }
 
     st.beginStroke();
     // snapshot grátis: paint() é imutável, então a referência congela o pré-traço
-    drag.current = { drawing: true, startX: x, startY: y, erase, lastX: x, lastY: y, lastKey: '', trail: [], orig: cel, mode: 'paint', moved: false, base: null };
+    drag.current = { drawing: true, startX: x, startY: y, erase, lastX: x, lastY: y, lastKey: '', trail: [], orig: cel, mode: 'paint', moved: false, base: null, anchorId: null, hbDX: 0, hbDY: 0, hbResize: false };
     applyStrokeTo(x, y, erase);
   };
 
@@ -356,6 +460,26 @@ export default function PixelCanvas() {
     if (!cell) return;
     const st = useStudio.getState();
     const [x, y] = cell;
+    if (d.mode === 'anchor' && d.anchorId) {
+      st.moveAnchorLive(d.anchorId, x, y);
+      d.lastX = x; d.lastY = y; d.moved = true;
+      return;
+    }
+    if (d.mode === 'hitbox') {
+      const f = st.project?.frames[st.currentFrameId ?? ''];
+      const hb = f?.hitbox;
+      if (hb) {
+        if (d.hbResize) st.setHitboxLive({ x: hb.x, y: hb.y, w: x - hb.x + 1, h: y - hb.y + 1 });
+        else st.setHitboxLive({ x: x - d.hbDX, y: y - d.hbDY, w: hb.w, h: hb.h });
+        d.moved = true;
+      }
+      return;
+    }
+    if (d.mode === 'metadraw') {
+      drawMarqueeLive(d.startX, d.startY, x, y);
+      d.moved = x !== d.startX || y !== d.startY;
+      return;
+    }
     if (d.mode === 'marquee') {
       drawMarqueeLive(d.startX, d.startY, x, y);
       d.moved = x !== d.startX || y !== d.startY;
@@ -381,6 +505,20 @@ export default function PixelCanvas() {
     if (!d?.drawing) return;
     drag.current = null;
     const st = useStudio.getState();
+    if (d.mode === 'anchor' || d.mode === 'hitbox') return; // undo único via beginStroke
+    if (d.mode === 'metadraw') {
+      const cell = cellFromEvent(e);
+      clearOverlay();
+      drawDecor();
+      if (!cell || !project) return;
+      const [x1, y1] = cell;
+      if (x1 === d.startX && y1 === d.startY) st.addAnchorAt(x1, y1);
+      else {
+        const n = normSel({ x0: d.startX, y0: d.startY, x1, y1 });
+        st.setHitbox({ x: n.x0, y: n.y0, w: n.x1 - n.x0 + 1, h: n.y1 - n.y0 + 1 });
+      }
+      return;
+    }
     if (d.mode === 'marquee') {
       const cell = cellFromEvent(e);
       clearOverlay();
@@ -395,7 +533,7 @@ export default function PixelCanvas() {
     if (st.tool === 'line' || st.tool === 'rect' || st.tool === 'ellipse') {
       const cell = cellFromEvent(e);
       clearOverlay();
-      drawAnts(0); // restaura ants por baixo do preview da forma
+      drawDecor(); // restaura ants + meta por baixo do preview da forma
       if (!cell || !project) return;
       const [x1, y1] = cell;
       let pts: Array<[number, number]> = [];
