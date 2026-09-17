@@ -133,8 +133,11 @@ export default function Projects() {
             <span className="font-display text-base font-bold text-white">PixelForge <span className="text-slate-500">Studio</span></span>
           </Link>
           <div className="flex-1" />
-          <Link to="/lab" className="flex items-center gap-1.5 rounded-lg border border-pixel-500/50 bg-pixel-500/10 px-3 py-2 text-xs font-bold text-pixel-400 hover:bg-pixel-500/20">
-            <FlaskConical size={14} /> Lab Procedural
+          <Link to="/gerador" className="flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-forge-500 to-pixel-500 px-3 py-2 text-xs font-bold text-ink-950 hover:brightness-110">
+            <Sparkles size={14} /> Gerador de Sprites
+          </Link>
+          <Link to="/lab" className="flex items-center gap-1.5 rounded-lg border border-ink-600 px-3 py-2 text-xs font-semibold text-slate-300 hover:border-pixel-500">
+            <FlaskConical size={14} /> Lab
           </Link>
           {user ? (
             <span className="flex items-center gap-2 rounded-full border border-ink-600 bg-ink-900 px-3 py-1.5 text-xs font-semibold text-slate-200">

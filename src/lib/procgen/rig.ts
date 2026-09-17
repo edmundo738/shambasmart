@@ -145,3 +145,21 @@ export function ell(cx: number, cy: number, rx: number, ry: number, c: string): 
 export function carve(pixels: Px[], pred: (x: number, y: number) => boolean): Px[] {
   return pixels.filter((p) => !pred(p.x, p.y));
 }
+
+/** Rasteriza pixels estáticos (coords em 32-space) em qualquer tamanho, com outline opcional */
+export function renderStatic(pixels32: Px[], size: number, outline: string | null): string[] {
+  const k = size / 32;
+  const seen = new Map<number, string>();
+  for (const p of pixels32) {
+    if (!p.c) continue;
+    const x = Math.round(p.x * k);
+    const y = Math.round(p.y * k);
+    if (x < 0 || y < 0 || x >= size || y >= size) continue;
+    seen.set(y * size + x, p.c);
+  }
+  const pixels: Px[] = [...seen.entries()].map(([i, c]) => ({ x: i % size, y: Math.floor(i / size), c }));
+  return rasterize(
+    { nodes: [{ id: 'root', parent: null, attach: { x: 0, y: 0 }, pixels, z: 0 }], w: size, h: size, outline },
+    {},
+  );
+}

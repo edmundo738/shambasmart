@@ -24,6 +24,19 @@ export interface Variation {
   light: number; // -100..100
 }
 
+export interface AssetRecipe {
+  version: 1;
+  kind: string;
+  seed: number;
+  subtype: string;
+  style: string;
+  size: number;
+  outline: boolean;
+  hueShift: number;
+  actions: Array<{ id: string; frames: number; fps: number }>;
+  motion?: { energy: number; amplitude: number; bounce: number };
+}
+
 export interface ProjectData {
   id: string;
   name: string;
@@ -33,6 +46,7 @@ export interface ProjectData {
   animations: Animation[];
   variations: Variation[];
   palette: string[];
+  recipe?: AssetRecipe;
   createdAt: number;
   updatedAt: number;
 }
