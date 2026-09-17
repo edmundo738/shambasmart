@@ -40,7 +40,7 @@ class Painter {
 function makeAnim(name: string, fps: number, frames: Frame[]): Animation {
   const ms = fpsToMs(fps);
   for (const f of frames) f.durationMs = ms;
-  return { id: uid('an'), name, fps, frameIds: frames.map((f) => f.id) };
+  return { id: uid('an'), name, fps, frameIds: frames.map((f) => f.id), playMode: 'loop' };
 }
 
 function collect(frames: Frame[]): Record<string, Frame> {

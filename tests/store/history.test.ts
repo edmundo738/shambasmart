@@ -17,7 +17,7 @@ function fixture(): { project: ProjectData; frameId: string; layerId: string } {
   const project: ProjectData = {
     id: 'pj', name: 't', width: 4, height: 4,
     layers: [layer], frames: { [frame.id]: frame },
-    animations: [{ id: 'an', name: 'idle', fps: 8, frameIds: [frame.id] }],
+    animations: [{ id: 'an', name: 'idle', fps: 8, frameIds: [frame.id], playMode: 'loop' }],
     variations: [], palette: ['#ff0000', '#00ff00'],
     createdAt: 0, updatedAt: 0,
   };

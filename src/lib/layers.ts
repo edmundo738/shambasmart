@@ -1,4 +1,4 @@
-import { DEFAULT_FRAME_MS, Frame, Layer, ProjectData, uid } from '../types';
+import { DEFAULT_FRAME_MS, Frame, Layer, PlayMode, ProjectData, uid } from '../types';
 import { clampMs, fpsToMs } from './timeline';
 import { emptyCells } from './pixels';
 
@@ -95,6 +95,13 @@ export function migrateProject(p: ProjectData): ProjectData {
   }
   const legacyMs = (id: string, v: number | undefined) =>
     typeof v === 'number' ? clampMs(v) : fpsOf.has(id) ? fpsToMs(fpsOf.get(id)!) : DEFAULT_FRAME_MS;
+  let animsChanged = false;
+  const animations = (p.animations ?? []).map((a) => {
+    const mode = (a as { playMode?: PlayMode }).playMode;
+    if (mode === 'loop' || mode === 'pingpong' || mode === 'reverse') return a;
+    animsChanged = true;
+    return { ...a, playMode: 'loop' as PlayMode };
+  });
   if (raw.layers && raw.layers.length > 0) {
     let changed = false;
     const frames: Record<string, Frame> = {};
@@ -108,8 +115,8 @@ export function migrateProject(p: ProjectData): ProjectData {
         changed = true;
       }
     }
-    if (!changed) return p;
-    return { ...p, frames };
+    if (!changed && !animsChanged) return p;
+    return { ...p, frames, animations };
   }
   const layer = createLayer('Camada 1');
   const frames: Record<string, Frame> = {};
@@ -120,5 +127,5 @@ export function migrateProject(p: ProjectData): ProjectData {
       durationMs: legacyMs(id, f.durationMs),
     };
   }
-  return { ...p, layers: [layer], frames };
+  return { ...p, layers: [layer], frames, animations };
 }

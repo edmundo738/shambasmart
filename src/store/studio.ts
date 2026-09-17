@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import {
-  Animation, Frame, Layer, ORIGINAL_VARIATION_ID, ProjectData, SelRect, ToolId, Variation, uid,
+  Animation, Frame, Layer, ORIGINAL_VARIATION_ID, PlayMode, ProjectData, SelRect, ToolId, Variation, uid,
 } from '../types';
 import { emptyCells, moveRect } from '../lib/pixels';
 import { clampMs, fpsToMs, frameMs, moveIdTo } from '../lib/timeline';
@@ -52,6 +52,11 @@ interface StudioState {
   mirrorY: boolean;
   showGrid: boolean;
   onionSkin: boolean;
+  onionPrev: number;
+  onionNext: number;
+  onionOpacity: number;
+  onionTintPrev: string;
+  onionTintNext: string;
   zoom: number;
   playing: boolean;
   currentAnimationId: string | null;
@@ -78,6 +83,11 @@ interface StudioState {
   toggleMirrorY: () => void;
   toggleGrid: () => void;
   toggleOnion: () => void;
+  setOnionPrev: (n: number) => void;
+  setOnionNext: (n: number) => void;
+  setOnionOpacity: (n: number) => void;
+  setOnionTintPrev: (c: string) => void;
+  setOnionTintNext: (c: string) => void;
   setZoom: (z: number) => void;
   setPlaying: (b: boolean) => void;
   select: (animId: string | null, frameId?: string | null) => void;
@@ -127,6 +137,7 @@ interface StudioState {
   duplicateAnimation: (id: string) => void;
   addAnimationWithFrames: (name: string, fps: number, framesCells: string[][]) => void;
   setAnimFps: (id: string, fps: number) => void;
+  setPlayMode: (id: string, mode: PlayMode) => void;
 
   // variações
   addVariation: (name?: string) => string;
@@ -218,6 +229,11 @@ export const useStudio = create<StudioState>((set, get) => ({
   mirrorY: false,
   showGrid: true,
   onionSkin: true,
+  onionPrev: 1,
+  onionNext: 0,
+  onionOpacity: 32,
+  onionTintPrev: '#ff4d6d',
+  onionTintNext: '#22b8f0',
   zoom: 12,
   playing: true,
   currentAnimationId: null,
@@ -250,7 +266,7 @@ export const useStudio = create<StudioState>((set, get) => ({
   newEmptyProject: (name, w, h) => {
     const layer = createLayer('Camada 1');
     const frame: Frame = makeFrame(layer.id, emptyCells(w, h), fpsToMs(8));
-    const anim: Animation = { id: uid('an'), name: 'idle', fps: 8, frameIds: [frame.id] };
+    const anim: Animation = { id: uid('an'), name: 'idle', fps: 8, frameIds: [frame.id], playMode: 'loop' };
     const now = Date.now();
     const project: ProjectData = {
       id: uid('pj'), name, width: w, height: h,
@@ -293,6 +309,11 @@ export const useStudio = create<StudioState>((set, get) => ({
   toggleMirrorY: () => set((s) => ({ mirrorY: !s.mirrorY })),
   toggleGrid: () => set((s) => ({ showGrid: !s.showGrid })),
   toggleOnion: () => set((s) => ({ onionSkin: !s.onionSkin })),
+  setOnionPrev: (n) => set({ onionPrev: Math.max(0, Math.min(3, Math.round(n))) }),
+  setOnionNext: (n) => set({ onionNext: Math.max(0, Math.min(3, Math.round(n))) }),
+  setOnionOpacity: (n) => set({ onionOpacity: Math.max(5, Math.min(80, Math.round(n))) }),
+  setOnionTintPrev: (c) => set({ onionTintPrev: c }),
+  setOnionTintNext: (c) => set({ onionTintNext: c }),
   setZoom: (zoom) => set({ zoom: Math.max(4, Math.min(32, zoom)) }),
   setPlaying: (playing) => set({ playing }),
 
@@ -674,7 +695,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     const hist = pushHistory(s);
     const frame: Frame = { id: uid('fr'), cels: emptyCels(s.project), durationMs: fpsToMs(8) };
     const count = s.project.animations.length + 1;
-    const anim: Animation = { id: uid('an'), name: name || `acao_${count}`, fps: 8, frameIds: [frame.id] };
+    const anim: Animation = { id: uid('an'), name: name || `acao_${count}`, fps: 8, frameIds: [frame.id], playMode: 'loop' };
     return {
       ...hist,
       project: {
@@ -730,7 +751,7 @@ export const useStudio = create<StudioState>((set, get) => ({
       frames[copy.id] = copy;
       return copy.id;
     });
-    const anim: Animation = { id: uid('an'), name: `${src.name}_copia`, fps: src.fps, frameIds };
+    const anim: Animation = { id: uid('an'), name: `${src.name}_copia`, fps: src.fps, frameIds, playMode: src.playMode ?? 'loop' };
     return {
       ...hist,
       project: { ...s.project, frames, animations: [...s.project.animations, anim], updatedAt: Date.now() },
@@ -757,7 +778,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     let finalName = name.trim().slice(0, 24) || 'auto';
     let k = 2;
     while (existing.has(finalName)) finalName = `${name.trim().slice(0, 20)}_${k++}`;
-    const anim: Animation = { id: uid('an'), name: finalName, fps: Math.max(1, Math.min(60, fps)), frameIds };
+    const anim: Animation = { id: uid('an'), name: finalName, fps: Math.max(1, Math.min(60, fps)), frameIds, playMode: 'loop' };
     return {
       ...hist,
       project: { ...s.project, frames, animations: [...s.project.animations, anim], updatedAt: Date.now() },
@@ -787,6 +808,21 @@ export const useStudio = create<StudioState>((set, get) => ({
         updatedAt: Date.now(),
       },
       dirty: true,
+    };
+  }),
+
+  setPlayMode: (id, mode) => set((s) => {
+    if (!s.project) return {};
+    const anim = s.project.animations.find((a) => a.id === id);
+    if (!anim || anim.playMode === mode) return {};
+    const hist = pushHistory(s);
+    return {
+      ...hist,
+      project: {
+        ...s.project,
+        animations: s.project.animations.map((a) => (a.id === id ? { ...a, playMode: mode } : a)),
+        updatedAt: Date.now(),
+      },
     };
   }),
 

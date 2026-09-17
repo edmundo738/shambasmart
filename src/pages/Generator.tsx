@@ -105,7 +105,7 @@ export default function Generator() {
         frames[f.id] = f;
         return f.id;
       });
-      return { id: uid('an'), name: a.label, fps: a.fps, frameIds };
+      return { id: uid('an'), name: a.label, fps: a.fps, frameIds, playMode: 'loop' };
     });
     const now = Date.now();
     return {

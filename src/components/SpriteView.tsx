@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { MIN_FRAME_MS, Variation } from '../types';
+import { MIN_FRAME_MS, PlayMode, Variation } from '../types';
+import { playbackOrder } from '../lib/timeline';
 import { RenderOpts, renderCellsToCanvas, renderStackToCanvas } from '../lib/exporters';
 
 export interface LayerStackItem {
@@ -63,6 +64,7 @@ interface AnimatedSpriteProps {
   fps?: number;
   /** duração por frame em ms (tem prioridade sobre fps quando presente) */
   durationsMs?: number[];
+  playMode?: PlayMode;
   scale?: number;
   variation?: Variation | null;
   background?: string;
@@ -73,12 +75,12 @@ interface AnimatedSpriteProps {
 
 /** Renderiza uma animação em loop */
 export function AnimatedSprite({
-  frames, width, height, fps = 8, durationsMs, scale = 4, variation = null,
+  frames, width, height, fps = 8, durationsMs, playMode = 'loop', scale = 4, variation = null,
   background = '', playing = true, className, style,
 }: AnimatedSpriteProps) {
   const ref = useRef<HTMLCanvasElement>(null);
-  const live = useRef({ frames, fps, durationsMs, scale, variation, background, playing, width, height });
-  live.current = { frames, fps, durationsMs, scale, variation, background, playing, width, height };
+  const live = useRef({ frames, fps, durationsMs, playMode, scale, variation, background, playing, width, height });
+  live.current = { frames, fps, durationsMs, playMode, scale, variation, background, playing, width, height };
 
   useEffect(() => {
     const dst = ref.current;
@@ -89,6 +91,8 @@ export function AnimatedSprite({
     let last = performance.now();
     let acc = 0;
     let index = 0;
+    let orderKey = '';
+    let order: number[] = [0];
 
     const draw = (i: number) => {
       const s = live.current;
@@ -109,30 +113,39 @@ export function AnimatedSprite({
       ctx.drawImage(src, 0, 0);
     };
 
-    draw(0);
+    order = playbackOrder(Math.max(1, live.current.frames.length), live.current.playMode ?? 'loop');
+    orderKey = `${Math.max(1, live.current.frames.length)}:${live.current.playMode ?? 'loop'}`;
+    draw(order[0] ?? 0);
     const tick = (now: number) => {
       const s = live.current;
       const dt = Math.min(100, now - last);
       last = now;
       const n = Math.max(1, s.frames.length);
-      if (s.playing && n > 1) {
+      const key = `${n}:${s.playMode ?? 'loop'}`;
+      if (key !== orderKey) {
+        orderKey = key;
+        order = playbackOrder(n, s.playMode ?? 'loop');
+        if (index >= order.length) index = 0;
+      }
+      const m = order.length;
+      if (s.playing && m > 1) {
         acc += dt;
         // passo por frame: consome o acumulado frame a frame (durações variadas OK)
         let advanced = false;
         let guard = 0;
-        while (guard++ <= n + 1) {
-          const raw = s.durationsMs?.[index % n];
+        while (guard++ <= m + 1) {
+          const raw = s.durationsMs?.[order[index % m]];
           const want = Number.isFinite(raw) && (raw as number) > 0 ? (raw as number) : 1000 / Math.max(1, s.fps);
           const step = Math.max(MIN_FRAME_MS, want);
           if (acc < step) break;
           acc -= step;
-          index = (index + 1) % n;
+          index = (index + 1) % m;
           advanced = true;
         }
-        if (advanced) draw(index);
-      } else if (index >= n) {
+        if (advanced) draw(order[index]);
+      } else if (index >= m) {
         index = 0;
-        draw(0);
+        draw(order[0] ?? 0);
       }
       raf = requestAnimationFrame(tick);
     };
@@ -151,7 +164,7 @@ export function AnimatedSprite({
   useEffect(() => {
     const dst = ref.current;
     if (!dst || playing) return;
-    const f = frames[0];
+    const f = frames[playbackOrder(frames.length, playMode)[0] ?? 0];
     if (!f) return;
     const src = renderItem(f, undefined, undefined, width, height, { scale, variation, background });
     dst.width = src.width;
@@ -159,7 +172,7 @@ export function AnimatedSprite({
     const ctx = dst.getContext('2d')!;
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(src, 0, 0);
-  }, [frames, width, height, scale, variation, background, playing]);
+  }, [frames, width, height, scale, variation, background, playing, playMode]);
 
   return <canvas ref={ref} className={`pixelated ${className ?? ''}`} style={style} />;
 }

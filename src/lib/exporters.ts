@@ -1,11 +1,11 @@
 import { GIFEncoder, quantize, applyPalette } from 'gifenc';
 import JSZip from 'jszip';
 import {
-  Animation, EnginePreset, Frame, ORIGINAL_VARIATION_ID, ProjectData, Variation,
+  Animation, EnginePreset, Frame, ORIGINAL_VARIATION_ID, PlayMode, ProjectData, Variation,
 } from '../types';
 import { applyVariationToColor } from './color';
 import { compositeStack } from './layers';
-import { clampMs, durationsOf, fpsToMs } from './timeline';
+import { clampMs, durationsOf, fpsToMs, playbackOrder } from './timeline';
 
 /* ------------------------------- render base ------------------------------ */
 
@@ -156,6 +156,7 @@ export function buildMetadata(
   fps: number,
   layers: Array<{ name: string; visible: boolean; opacity: number }> = [],
   durationsMs: number[] = [],
+  playMode: PlayMode = 'loop',
 ): object {
   const dur = (i: number) => clampMs(durationsMs[i] ?? fpsToMs(fps));
   switch (engine) {
@@ -174,31 +175,31 @@ export function buildMetadata(
       });
       return {
         frames,
-        meta: { app: 'PixelForge Studio', version: '1.0', image: imageFile, format: 'RGBA8888', size: { w: sheetW, h: sheetH }, scale: 1, layers },
+        meta: { app: 'PixelForge Studio', version: '1.0', image: imageFile, format: 'RGBA8888', size: { w: sheetW, h: sheetH }, scale: 1, playMode, layers },
       };
     }
     case 'unity': {
       return {
         frames: names.map((n, i) => ({ name: n, fps, durationMs: dur(i), rect: { ...rects[i] } })),
-        meta: { app: 'PixelForge Studio', image: imageFile, sheetSize: { w: sheetW, h: sheetH }, note: 'Importe como Sprite (Multiple) e fatie pela grade, ou use estes rects.', layers },
+        meta: { app: 'PixelForge Studio', image: imageFile, sheetSize: { w: sheetW, h: sheetH }, note: 'Importe como Sprite (Multiple) e fatie pela grade, ou use estes rects.', playMode, layers },
       };
     }
     case 'godot': {
       return {
         frames: names.map((n, i) => ({ name: n, durationMs: dur(i), ...rects[i] })),
-        meta: { app: 'PixelForge Studio', image: imageFile, sheetSize: { w: sheetW, h: sheetH }, fps, note: 'Use AtlasTexture com estes region rects, ou AnimatedSprite2D com SpriteFrames.', layers },
+        meta: { app: 'PixelForge Studio', image: imageFile, sheetSize: { w: sheetW, h: sheetH }, fps, note: 'Use AtlasTexture com estes region rects, ou AnimatedSprite2D com SpriteFrames.', playMode, layers },
       };
     }
     case 'gamemaker': {
       return {
         frames: names.map((n, i) => ({ name: n, durationMs: dur(i), ...rects[i] })),
-        meta: { app: 'PixelForge Studio', image: imageFile, fps, note: 'Importe a strip na ordem dos frames (esquerda -> direita, cima -> baixo).', layers },
+        meta: { app: 'PixelForge Studio', image: imageFile, fps, note: 'Importe a strip na ordem dos frames (esquerda -> direita, cima -> baixo).', playMode, layers },
       };
     }
     default: {
       return {
         frames: names.map((n, i) => ({ name: n, durationMs: dur(i), ...rects[i] })),
-        meta: { app: 'PixelForge Studio', image: imageFile, sheetSize: { w: sheetW, h: sheetH }, frameSize: { w: frameW, h: frameH }, fps, layers },
+        meta: { app: 'PixelForge Studio', image: imageFile, sheetSize: { w: sheetW, h: sheetH }, frameSize: { w: frameW, h: frameH }, fps, playMode, layers },
       };
     }
   }
@@ -208,11 +209,13 @@ export function buildMetadata(
 
 export function encodeGif(
   project: ProjectData, frames: Frame[], fps: number, scale: number, variation: Variation | null,
+  playMode: PlayMode = 'loop',
 ): Uint8Array {
   const w = project.width, h = project.height;
   const gif = GIFEncoder();
-  const delays = frames.map((f) => clampMs(f.durationMs ?? fpsToMs(fps)));
-  const datas: Uint8ClampedArray[] = frames.map((f) => {
+  const seq = playbackOrder(frames.length, playMode).map((i) => frames[i]);
+  const delays = seq.map((f) => clampMs(f.durationMs ?? fpsToMs(fps)));
+  const datas: Uint8ClampedArray[] = seq.map((f) => {
     const c = renderFrameToCanvas(project, f, { scale, variation });
     return c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data;
   });
@@ -311,6 +314,7 @@ export async function buildPackZip(project: ProjectData, opts: PackOpts): Promis
             frameNames, rects, anim.fps,
             project.layers.map((l) => ({ name: l.name, visible: l.visible, opacity: l.opacity })),
             durationsOf(anim, project.frames),
+            anim.playMode ?? 'loop',
           );
           folder.file(`${base}.json`, JSON.stringify(meta, null, 2));
         }
@@ -329,7 +333,7 @@ export async function buildPackZip(project: ProjectData, opts: PackOpts): Promis
       if (opts.includeGif) {
         try {
           const gifScale = Math.max(1, Math.min(opts.scale, Math.floor(256 / Math.max(project.width, project.height)) || 1));
-          const bytes = encodeGif(project, frames, anim.fps, gifScale, combo.v);
+          const bytes = encodeGif(project, frames, anim.fps, gifScale, combo.v, anim.playMode ?? 'loop');
           folder.file(`${base}.gif`, bytes);
         } catch {
           /* ignora falha isolada de GIF */
@@ -339,6 +343,7 @@ export async function buildPackZip(project: ProjectData, opts: PackOpts): Promis
 
     manifestAnims.push({
       name: anim.name, fps: anim.fps, frames: frames.length,
+      playMode: anim.playMode ?? 'loop',
       durationsMs: durationsOf(anim, project.frames),
       variations: combos.map((c) => c.name),
     });

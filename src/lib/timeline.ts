@@ -1,5 +1,5 @@
 /** Núcleo determinístico da timeline: timing, durações e reordenação (puros). */
-import { Animation, DEFAULT_FRAME_MS, Frame, MAX_FRAME_MS, MIN_FRAME_MS } from '../types';
+import { Animation, DEFAULT_FRAME_MS, Frame, MAX_FRAME_MS, MIN_FRAME_MS, PlayMode } from '../types';
 
 /** fps -> ms por frame (arredondado, dentro dos limites do editor). */
 export function fpsToMs(fps: number): number {
@@ -46,6 +46,29 @@ export function frameIndexAtTime(durationsMs: number[], t: number): number {
     if (rem < 0) return i;
   }
   return durationsMs.length - 1;
+}
+
+/**
+ * Ordem de reprodução p/ N frames: reverso inverte; ping-pong vai-e-volta
+ * sem repetir os extremos (0..n-1..1); loop é a identidade.
+ */
+export function playbackOrder(n: number, mode: PlayMode): number[] {
+  if (n <= 1) return n === 1 ? [0] : [];
+  if (mode === 'reverse') return Array.from({ length: n }, (_, i) => n - 1 - i);
+  if (mode === 'pingpong') {
+    const fwd = Array.from({ length: n }, (_, i) => i);
+    const back = Array.from({ length: n - 2 }, (_, i) => n - 2 - i);
+    return [...fwd, ...back];
+  }
+  return Array.from({ length: n }, (_, i) => i);
+}
+
+/** Expande durações na ordem do modo (base do player e do GIF). */
+export function expandPlayback(
+  durationsMs: number[], mode: PlayMode,
+): { order: number[]; durations: number[] } {
+  const order = playbackOrder(durationsMs.length, mode);
+  return { order, durations: order.map((i) => durationsMs[i]) };
 }
 
 /** Reordena ids movendo `id` para `toIndex` (puro; fora do intervalo = prende). */

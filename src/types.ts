@@ -23,11 +23,15 @@ export const DEFAULT_FRAME_MS = 100;
 export const MIN_FRAME_MS = 20;
 export const MAX_FRAME_MS = 2000;
 
+/** Modo de reprodução da ação: loop, ping-pong (vai-e-volta) ou reverso. */
+export type PlayMode = 'loop' | 'pingpong' | 'reverse';
+
 export interface Animation {
   id: string;
   name: string;
   fps: number;
   frameIds: string[];
+  playMode: PlayMode;
 }
 
 export interface Variation {

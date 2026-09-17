@@ -88,7 +88,7 @@ export default function Lab() {
         frames[f.id] = f;
         return f.id;
       });
-      return { id: uid('an'), name: def.label, fps: def.fps, frameIds };
+      return { id: uid('an'), name: def.label, fps: def.fps, frameIds, playMode: 'loop' };
     });
     const now = Date.now();
     return {
@@ -141,7 +141,7 @@ export default function Lab() {
       let k = 2;
       while (existing.has(name)) name = `${def.label}_${k++}`;
       existing.add(name);
-      return { id: uid('an'), name, fps: def.fps, frameIds };
+      return { id: uid('an'), name, fps: def.fps, frameIds, playMode: 'loop' };
     });
     const merged: ProjectData = { ...cur, frames, animations: [...cur.animations, ...anims], updatedAt: Date.now() };
     useStudio.getState().loadProject(merged);

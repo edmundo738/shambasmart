@@ -212,3 +212,14 @@ Legenda de status: ✅ sólido · 🟡 funcional mas amador · 🔴 ausente/frá
 8. Playback (`AnimatedSprite`), prévia e GIF usam duração por frame; JSON/pack.json trazem `durationsMs`.
 9. Fix: excluir/recortar o atual seleciona o vizinho (antes pulava p/ o 1º).
 10. Testes: `timeline` (13) + `store/timeline` (9) — suíte em 74/74.
+
+## Veredito FASE C2 (entregue)
+
+1. `Animation.playMode`: loop | ping-pong | reverso, por ação, com undo; migração preenche legados.
+2. `playbackOrder`/`expandPlayback` puros: ping-pong não repete extremos; player, prévia e GIF ouvem o modo.
+3. Seletor segmentado na Timeline + duração total da ação (ms/s).
+4. Onion skin: 0–3 anteriores + 0–3 posteriores, opacidade 5–80%, tintas configuráveis, falloff linear.
+5. Toggle onion também na Timeline (descoberta); ícone do rail corrigido (Layers → Ghost).
+6. Preview 1x "tamanho do jogo"; JSON/pack.json trazem `playMode`.
+7. Dicas de atalho atualizadas (M, Ctrl+C/X/V).
+8. Testes: `timeline` +4, `store/timeline` +3 — suíte em 81/81.

@@ -1,5 +1,5 @@
 import {
-  BoxSelect, Brush, Circle, Crosshair, Eraser, FlipHorizontal2, FlipVertical2, Grid3x3, Layers, PaintBucket, Pipette,
+  BoxSelect, Brush, Circle, Crosshair, Eraser, FlipHorizontal2, FlipVertical2, Ghost, Grid3x3, PaintBucket, Pipette,
   Slash, Square,
 } from 'lucide-react';
 import { useStudio } from '../../store/studio';
@@ -84,8 +84,8 @@ export default function Toolbar() {
       <button title="Pixel-perfect 1px (P)" onClick={togglePixelPerfect} className={btn(pixelPerfect)}>
         <Crosshair size={18} />
       </button>
-      <button title="Onion skin (ver frame anterior)" onClick={toggleOnion} className={btn(onionSkin)}>
-        <Layers size={18} />
+      <button title="Onion skin (ver frames vizinhos)" onClick={toggleOnion} className={btn(onionSkin)}>
+        <Ghost size={18} />
       </button>
     </div>
   );

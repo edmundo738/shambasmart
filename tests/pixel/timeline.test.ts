@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  clampMs, durationsOf, fpsToMs, frameIndexAtTime, frameMs, moveIdTo, msToFps, totalDurationMs,
+  clampMs, durationsOf, expandPlayback, fpsToMs, frameIndexAtTime, frameMs, moveIdTo, msToFps,
+  playbackOrder, totalDurationMs,
 } from '../../src/lib/timeline';
 import { Frame } from '../../src/types';
 
@@ -36,7 +37,7 @@ describe('conversão fps/ms', () => {
 });
 
 describe('durações da ação', () => {
-  const anim = { id: 'an', name: 'x', fps: 8, frameIds: ['a', 'b', 'missing'] };
+  const anim = { id: 'an', name: 'x', fps: 8, frameIds: ['a', 'b', 'missing'], playMode: 'loop' as const };
   const frames = { a: fr('a', 100), b: fr('b', 200) };
 
   it('durationsOf preenche ausentes com o padrão', () => {
@@ -79,5 +80,30 @@ describe('moveIdTo', () => {
     const out = moveIdTo(ids, 'z', 0);
     expect(out).toEqual(ids);
     expect(out).not.toBe(ids);
+  });
+});
+
+describe('playbackOrder', () => {
+  it('loop é identidade; reverso inverte', () => {
+    expect(playbackOrder(4, 'loop')).toEqual([0, 1, 2, 3]);
+    expect(playbackOrder(4, 'reverse')).toEqual([3, 2, 1, 0]);
+  });
+
+  it('ping-pong vai-e-volta sem repetir extremos', () => {
+    expect(playbackOrder(4, 'pingpong')).toEqual([0, 1, 2, 3, 2, 1]);
+    expect(playbackOrder(2, 'pingpong')).toEqual([0, 1]);
+  });
+
+  it('casos degenerados', () => {
+    expect(playbackOrder(0, 'pingpong')).toEqual([]);
+    expect(playbackOrder(1, 'reverse')).toEqual([0]);
+  });
+});
+
+describe('expandPlayback', () => {
+  it('expande durações na ordem do modo', () => {
+    const { order, durations } = expandPlayback([100, 200, 300], 'pingpong');
+    expect(order).toEqual([0, 1, 2, 1]);
+    expect(durations).toEqual([100, 200, 300, 200]);
   });
 });

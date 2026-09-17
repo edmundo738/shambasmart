@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import {
-  ArrowLeft, ArrowRight, ClipboardCopy, ClipboardPaste, Copy, Eraser, Film, Pause, Play, Plus, Scissors,
-  StepBack, StepForward, Timer, Trash2,
+  ArrowLeft, ArrowRight, ArrowLeftRight, ClipboardCopy, ClipboardPaste, Copy, Eraser, Film, Ghost, Minus, Pause,
+  Play, Plus, Repeat, Rewind, Scissors, StepBack, StepForward, Timer, Trash2,
 } from 'lucide-react';
 import { useStudio } from '../../store/studio';
 import { SpriteCanvas } from '../SpriteView';
 import { celStack } from '../../lib/layers';
-import { frameMs } from '../../lib/timeline';
-import { MAX_FRAME_MS, MIN_FRAME_MS } from '../../types';
+import { frameMs, totalDurationMs } from '../../lib/timeline';
+import { MAX_FRAME_MS, MIN_FRAME_MS, PlayMode } from '../../types';
 
 export default function Timeline() {
   const project = useStudio((s) => s.project);
@@ -26,6 +26,19 @@ export default function Timeline() {
   const pasteFrame = useStudio((s) => s.pasteFrame);
   const frameClipboard = useStudio((s) => s.frameClipboard);
   const clearFrame = useStudio((s) => s.clearFrame);
+  const setPlayMode = useStudio((s) => s.setPlayMode);
+  const onionSkin = useStudio((s) => s.onionSkin);
+  const toggleOnion = useStudio((s) => s.toggleOnion);
+  const onionPrev = useStudio((s) => s.onionPrev);
+  const onionNext = useStudio((s) => s.onionNext);
+  const onionOpacity = useStudio((s) => s.onionOpacity);
+  const onionTintPrev = useStudio((s) => s.onionTintPrev);
+  const onionTintNext = useStudio((s) => s.onionTintNext);
+  const setOnionPrev = useStudio((s) => s.setOnionPrev);
+  const setOnionNext = useStudio((s) => s.setOnionNext);
+  const setOnionOpacity = useStudio((s) => s.setOnionOpacity);
+  const setOnionTintPrev = useStudio((s) => s.setOnionTintPrev);
+  const setOnionTintNext = useStudio((s) => s.setOnionTintNext);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
   const playing = useStudio((s) => s.playing);
@@ -36,6 +49,7 @@ export default function Timeline() {
   const anim = project.animations.find((a) => a.id === currentAnimationId) ?? project.animations[0];
   if (!anim) return null;
   const currentFrame = currentFrameId ? project.frames[currentFrameId] : undefined;
+  const total = totalDurationMs(anim, project.frames);
 
   const iconBtn = 'flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-ink-700 hover:text-slate-100 disabled:opacity-30';
 
@@ -78,6 +92,57 @@ export default function Timeline() {
           />
           <span className="w-6 font-mono text-slate-200">{anim.fps}</span>
         </label>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-ink-800 pt-2 text-xs text-slate-400">
+        <div className="flex items-center gap-0.5" title="Modo de reprodução da ação">
+          {([
+            { m: 'loop', icon: <Repeat size={13} />, label: 'Loop' },
+            { m: 'pingpong', icon: <ArrowLeftRight size={13} />, label: 'Ping-pong (vai e volta)' },
+            { m: 'reverse', icon: <Rewind size={13} />, label: 'Reverso' },
+          ] as Array<{ m: PlayMode; icon: React.ReactNode; label: string }>).map((o) => (
+            <button
+              key={o.m}
+              onClick={() => setPlayMode(anim.id, o.m)}
+              title={o.label}
+              className={`flex h-6 w-6 items-center justify-center rounded-md ${anim.playMode === o.m ? 'bg-forge-500/20 text-forge-300' : 'text-slate-500 hover:bg-ink-800 hover:text-slate-200'}`}
+            >
+              {o.icon}
+            </button>
+          ))}
+        </div>
+        <span className="font-mono text-[11px] text-slate-500" title="Duração total da ação">
+          {total >= 1000 ? `${(total / 1000).toFixed(1)}s` : `${total}ms`}
+        </span>
+        <span className="h-4 w-px bg-ink-700" />
+        <div className="flex items-center gap-1" title="Onion skin: ver frames vizinhos no canvas">
+          <button
+            onClick={toggleOnion}
+            title={onionSkin ? 'Ocultar onion skin' : 'Mostrar onion skin'}
+            className={`flex h-6 w-6 items-center justify-center rounded-md ${onionSkin ? 'bg-pixel-500/20 text-pixel-300' : 'text-slate-500 hover:bg-ink-800 hover:text-slate-200'}`}
+          >
+            <Ghost size={13} />
+          </button>
+          <button onClick={() => setOnionPrev(onionPrev - 1)} disabled={onionPrev <= 0} title="Menos anteriores" className="flex h-5 w-5 items-center justify-center rounded text-slate-500 hover:bg-ink-800 disabled:opacity-30"><Minus size={11} /></button>
+          <span className="font-mono text-[11px] text-slate-300" title="Frames anteriores">−{onionPrev}</span>
+          <button onClick={() => setOnionPrev(onionPrev + 1)} disabled={onionPrev >= 3} title="Mais anteriores" className="flex h-5 w-5 items-center justify-center rounded text-slate-500 hover:bg-ink-800 disabled:opacity-30"><Plus size={11} /></button>
+          <span className="text-slate-600">/</span>
+          <button onClick={() => setOnionNext(onionNext - 1)} disabled={onionNext <= 0} title="Menos posteriores" className="flex h-5 w-5 items-center justify-center rounded text-slate-500 hover:bg-ink-800 disabled:opacity-30"><Minus size={11} /></button>
+          <span className="font-mono text-[11px] text-slate-300" title="Frames posteriores">+{onionNext}</span>
+          <button onClick={() => setOnionNext(onionNext + 1)} disabled={onionNext >= 3} title="Mais posteriores" className="flex h-5 w-5 items-center justify-center rounded text-slate-500 hover:bg-ink-800 disabled:opacity-30"><Plus size={11} /></button>
+          <input
+            type="range" min={5} max={80} value={onionOpacity}
+            onChange={(e) => setOnionOpacity(Number(e.target.value))}
+            title={`Opacidade ${onionOpacity}%`}
+            className="h-1 w-14 cursor-pointer"
+          />
+          <label title="Tinta dos anteriores" className="h-4 w-4 cursor-pointer overflow-hidden rounded-full border border-ink-600" style={{ background: onionTintPrev }}>
+            <input type="color" value={onionTintPrev} onChange={(e) => setOnionTintPrev(e.target.value)} className="h-full w-full opacity-0" />
+          </label>
+          <label title="Tinta dos posteriores" className="h-4 w-4 cursor-pointer overflow-hidden rounded-full border border-ink-600" style={{ background: onionTintNext }}>
+            <input type="color" value={onionTintNext} onChange={(e) => setOnionTintNext(e.target.value)} className="h-full w-full opacity-0" />
+          </label>
+        </div>
       </div>
 
       <div className="thin-scroll flex items-stretch gap-2 overflow-x-auto pb-1">

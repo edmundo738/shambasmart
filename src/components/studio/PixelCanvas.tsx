@@ -35,13 +35,17 @@ export default function PixelCanvas() {
   const mirrorY = useStudio((s) => s.mirrorY);
   const showGrid = useStudio((s) => s.showGrid);
   const onionSkin = useStudio((s) => s.onionSkin);
+  const onionPrev = useStudio((s) => s.onionPrev);
+  const onionNext = useStudio((s) => s.onionNext);
+  const onionOpacity = useStudio((s) => s.onionOpacity);
+  const onionTintPrev = useStudio((s) => s.onionTintPrev);
+  const onionTintNext = useStudio((s) => s.onionTintNext);
   const zoom = useStudio((s) => s.zoom);
   const selection = useStudio((s) => s.selection);
 
   const anim = project?.animations.find((a) => a.id === currentAnimationId) ?? project?.animations[0];
   const frame = currentFrameId ? project?.frames[currentFrameId] : undefined;
   const frameIndex = anim && currentFrameId ? anim.frameIds.indexOf(currentFrameId) : -1;
-  const prevFrame = project && anim && frameIndex > 0 ? project.frames[anim.frameIds[frameIndex - 1]] : undefined;
 
   /* ------------------------------- render -------------------------------- */
   useEffect(() => {
@@ -54,18 +58,23 @@ export default function PixelCanvas() {
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // onion skin (frame anterior mesclado, em vermelho fantasma)
-    if (onionSkin && prevFrame && prevFrame.id !== frame.id) {
-      const prev = flattenCells(project, prevFrame);
-      ctx.globalAlpha = 0.32;
-      for (let y = 0; y < h; y++) {
-        for (let x = 0; x < w; x++) {
-          if (prev[y * w + x]) {
-            ctx.fillStyle = '#ff4d6d';
-            ctx.fillRect(x * zoom, y * zoom, zoom, zoom);
+    // onion skin: N anteriores + N posteriores, tintas e alpha configuráveis (falloff linear)
+    if (onionSkin && anim) {
+      const base = onionOpacity / 100;
+      const ghost = (fid: string | undefined, tint: string, count: number, k: number) => {
+        const gf = fid ? project.frames[fid] : undefined;
+        if (!gf || gf.id === frame.id || count <= 0) return;
+        const flat = flattenCells(project, gf);
+        ctx.globalAlpha = base * ((count - k + 1) / count);
+        ctx.fillStyle = tint;
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            if (flat[y * w + x]) ctx.fillRect(x * zoom, y * zoom, zoom, zoom);
           }
         }
-      }
+      };
+      for (let k = 1; k <= onionPrev; k++) ghost(anim.frameIds[frameIndex - k], onionTintPrev, onionPrev, k);
+      for (let k = 1; k <= onionNext; k++) ghost(anim.frameIds[frameIndex + k], onionTintNext, onionNext, k);
       ctx.globalAlpha = 1;
     }
 
@@ -99,7 +108,7 @@ export default function PixelCanvas() {
       }
       ctx.stroke();
     }
-  }, [project, frame, prevFrame, zoom, showGrid, onionSkin]);
+  }, [project, frame, frameIndex, currentAnimationId, zoom, showGrid, onionSkin, onionPrev, onionNext, onionOpacity, onionTintPrev, onionTintNext]);
 
   const cellFromEvent = useCallback((e: React.PointerEvent): [number, number] | null => {
     const canvas = canvasRef.current;

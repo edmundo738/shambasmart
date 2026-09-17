@@ -51,6 +51,7 @@ export default function PreviewPanel() {
           height={project.height}
           fps={anim.fps}
           durationsMs={durationsMs}
+          playMode={anim.playMode ?? 'loop'}
           scale={zoom}
           variation={variation}
           playing={playing}
@@ -77,9 +78,10 @@ export default function PreviewPanel() {
         </div>
         <div className="flex-1" />
         <span className="text-[11px] text-slate-500">Zoom</span>
-        {[4, 6, 8].map((z) => (
+        {[1, 4, 6, 8].map((z) => (
           <button
             key={z}
+            title={z === 1 ? 'Tamanho do jogo (1x)' : `Zoom ${z}x`}
             onClick={() => setZoom(z)}
             className={`rounded px-1.5 py-0.5 font-mono text-[11px] ${zoom === z ? 'bg-forge-500/20 text-forge-300' : 'text-slate-500 hover:text-slate-200'}`}
           >

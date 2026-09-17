@@ -20,7 +20,7 @@ function fixture(): ProjectData {
     id: 'pj', name: 't', width: 4, height: 4,
     layers: [layer],
     frames: { [f0.id]: f0, [f1.id]: f1, [f2.id]: f2 },
-    animations: [{ id: 'an', name: 'idle', fps: 8, frameIds: [f0.id, f1.id, f2.id] }],
+    animations: [{ id: 'an', name: 'idle', fps: 8, frameIds: [f0.id, f1.id, f2.id], playMode: 'loop' }],
     variations: [], palette: [],
     createdAt: 0, updatedAt: 0,
   };
@@ -156,5 +156,43 @@ describe('migração preenche durações', () => {
     }
     const twice = migrateProject(once);
     expect(twice).toBe(once); // sem mudança -> mesma referência
+  });
+});
+
+describe('modo de reprodução', () => {
+  it('setPlayMode define com undo; repetir não empilha', () => {
+    load();
+    st().setPlayMode('an', 'pingpong');
+    expect(anim().playMode).toBe('pingpong');
+    expect(st().past.length).toBe(1);
+    st().setPlayMode('an', 'pingpong');
+    expect(st().past.length).toBe(1);
+    st().undo();
+    expect(anim().playMode).toBe('loop');
+  });
+});
+
+describe('onion skin configurável', () => {
+  it('defaults + limites', () => {
+    load();
+    expect([st().onionPrev, st().onionNext, st().onionOpacity]).toEqual([1, 0, 32]);
+    expect([st().onionTintPrev, st().onionTintNext]).toEqual(['#ff4d6d', '#22b8f0']);
+    st().setOnionPrev(9);
+    st().setOnionNext(-2);
+    st().setOnionOpacity(200);
+    expect([st().onionPrev, st().onionNext, st().onionOpacity]).toEqual([3, 0, 80]);
+    st().setOnionTintPrev('#123456');
+    expect(st().onionTintPrev).toBe('#123456');
+  });
+});
+
+describe('migração preenche playMode', () => {
+  it('ausente ou inválido vira loop', () => {
+    const legacy = JSON.parse(JSON.stringify(fixture())) as ProjectData;
+    delete (legacy.animations[0] as unknown as Record<string, unknown>).playMode;
+    expect(migrateProject(legacy).animations[0].playMode).toBe('loop');
+    const weird = JSON.parse(JSON.stringify(fixture())) as ProjectData;
+    (weird.animations[0] as unknown as Record<string, unknown>).playMode = 'bounce';
+    expect(migrateProject(weird).animations[0].playMode).toBe('loop');
   });
 });
