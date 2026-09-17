@@ -103,6 +103,25 @@ Regras de engenharia:
 - [x] **F6 (parcial) — Motion**: 6 ações × 3 grupos + 7 presets de auto-movimento
 - [x] **F9 (parcial) — Variantes**: 6 temas determinísticos sobre `AssetRecipe` + modal compara/salva (forma/roupa/raridade pendentes)
 - [x] **F11 (parcial) — Batch**: 3 packs temáticos coerentes + ZIP combinado + grade da Biblioteca (fila/galeria de candidatos pendentes)
+- [x] **F16 (parcial) — AssetCore**: `AssetMaster` serializável + fingerprint + `parseMaster` (versionamento/migração pendentes)
+- [x] **F17 (parcial) — SkeletonCore/MotionCore**: 4 esqueletos resolvidos nos motores reais + catálogo aplicável rig/retarget/procedural (IK, bird/snake/dragon, custom pendentes)
+
+## 4. Spec v2 (§26) → arquivos (status)
+
+| Módulo da spec | Arquivo(s) | Status |
+|---|---|---|
+| AssetCore | `src/lib/core/engine.ts`, `assetMaster.ts` | Master + fingerprint + parse ✓ |
+| SkeletonCore | `src/lib/core/skeletons.ts` | 4 templates → rig real ✓ |
+| MotionCore / Retargeting | `src/lib/core/motionLibrary.ts` + `procgen/motions.ts`, `retarget.ts` | catálogo aplicável ✓ |
+| PartSystem / Roupas / Equip | — | pendente (F10) |
+| StyleEngine | `src/lib/procgen/styles.ts`, `variants.ts` | presets + temas ✓ (gramática pendente) |
+| PixelRasterizer | `src/lib/procgen/rig.ts` | rasterize + outline ✓ (densidade pendente) |
+| ProceduralEngine | `src/lib/procgen/{generator,bodies,weapons,items,fx}.ts` | ✓ |
+| VariantEngine | `src/lib/procgen/variants.ts`, `bundles.ts` | ✓ (batch 100 pendente) |
+| QualityEngine | `compareFrames` + Verificar no Studio | determinismo ✓ (stray pixels etc. pendentes) |
+| CameraCore / 2.5D | — | pendente (F7/F8) |
+| ExportEngine | `src/lib/exporters.ts` | ZIP/GIF/JSON ✓ (APNG/atlas/engines pendentes) |
+| IKSolver / Auto-Rig / Hidden-Pixel | — | pendente (F18 próxima fronteira) |
 - [ ] **F7 — Multi-ângulo**: 4/8 direções do mesmo Master (próx. núcleo grande)
 - [ ] **F8 — 2.5D**: profundidade, câmera orbital, projeção ortográfica
 - [ ] **F9 — Variantes profundas**: forma/proporção/roupa/raridade + LOCK/REROLL
@@ -113,7 +132,7 @@ Regras de engenharia:
 - [ ] **F14 — Performance**: workers, OffscreenCanvas, cache incremental, 60fps
 - [ ] **F15 — QA**: suíte de regressão por seeds + checklist de demo (20 itens)
 
-## 4. Modelo de negócio (resumo)
+## 5. Modelo de negócio (resumo)
 
 Edição + export básico sempre úteis no grátis, sem watermark obrigatório.
 Cobrança = nuvem, colaboração, render/batch pesado, versionamento, equipes.
