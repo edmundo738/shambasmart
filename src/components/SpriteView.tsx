@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Variation } from '../types';
+import { MIN_FRAME_MS, Variation } from '../types';
 import { RenderOpts, renderCellsToCanvas, renderStackToCanvas } from '../lib/exporters';
 
 export interface LayerStackItem {
@@ -61,6 +61,8 @@ interface AnimatedSpriteProps {
   width: number;
   height: number;
   fps?: number;
+  /** duração por frame em ms (tem prioridade sobre fps quando presente) */
+  durationsMs?: number[];
   scale?: number;
   variation?: Variation | null;
   background?: string;
@@ -71,12 +73,12 @@ interface AnimatedSpriteProps {
 
 /** Renderiza uma animação em loop */
 export function AnimatedSprite({
-  frames, width, height, fps = 8, scale = 4, variation = null,
+  frames, width, height, fps = 8, durationsMs, scale = 4, variation = null,
   background = '', playing = true, className, style,
 }: AnimatedSpriteProps) {
   const ref = useRef<HTMLCanvasElement>(null);
-  const live = useRef({ frames, fps, scale, variation, background, playing, width, height });
-  live.current = { frames, fps, scale, variation, background, playing, width, height };
+  const live = useRef({ frames, fps, durationsMs, scale, variation, background, playing, width, height });
+  live.current = { frames, fps, durationsMs, scale, variation, background, playing, width, height };
 
   useEffect(() => {
     const dst = ref.current;
@@ -115,13 +117,19 @@ export function AnimatedSprite({
       const n = Math.max(1, s.frames.length);
       if (s.playing && n > 1) {
         acc += dt;
-        const step = 1000 / Math.max(1, s.fps);
-        if (acc >= step) {
-          const adv = Math.floor(acc / step);
-          acc %= step;
-          index = (index + adv) % n;
-          draw(index);
+        // passo por frame: consome o acumulado frame a frame (durações variadas OK)
+        let advanced = false;
+        let guard = 0;
+        while (guard++ <= n + 1) {
+          const raw = s.durationsMs?.[index % n];
+          const want = Number.isFinite(raw) && (raw as number) > 0 ? (raw as number) : 1000 / Math.max(1, s.fps);
+          const step = Math.max(MIN_FRAME_MS, want);
+          if (acc < step) break;
+          acc -= step;
+          index = (index + 1) % n;
+          advanced = true;
         }
+        if (advanced) draw(index);
       } else if (index >= n) {
         index = 0;
         draw(0);

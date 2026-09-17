@@ -4,6 +4,7 @@ import { useStudio } from '../../store/studio';
 import { ORIGINAL_VARIATION_ID } from '../../types';
 import { AnimatedSprite, SpriteCanvas } from '../SpriteView';
 import { celStack, frameItem } from '../../lib/layers';
+import { durationsOf } from '../../lib/timeline';
 
 const BACKGROUNDS = [
   { id: 'checker', label: 'Transparente', css: '', checker: true },
@@ -25,6 +26,7 @@ export default function PreviewPanel() {
   const anim = project.animations.find((a) => a.id === currentAnimationId) ?? project.animations[0];
   if (!anim) return null;
   const frames = anim.frameIds.map((fid) => project.frames[fid]).filter(Boolean).map((f) => frameItem(project.layers, f));
+  const durationsMs = durationsOf(anim, project.frames);
   const variation = variationId === ORIGINAL_VARIATION_ID
     ? null
     : project.variations.find((v) => v.id === variationId) ?? null;
@@ -48,6 +50,7 @@ export default function PreviewPanel() {
           width={project.width}
           height={project.height}
           fps={anim.fps}
+          durationsMs={durationsMs}
           scale={zoom}
           variation={variation}
           playing={playing}

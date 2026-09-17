@@ -199,3 +199,16 @@ Legenda de status: ✅ sólido · 🟡 funcional mas amador · 🔴 ausente/frá
 6. Undo/redo inclui paleta + variações + renomeação/FPS; sliders coalescidos (~1.2s, sem passos vazios).
 7. `.gpl` (GIMP): importar/exportar no PalettePanel; parser tolerante, roundtrip testado.
 8. Testes: `select` (6), `gpl` (5), `store/history` (8) — suíte em 55/55.
+
+## Veredito FASE C1 (entregue)
+
+1. `Frame.durationMs` é a fonte da verdade do timing (20–2000ms, padrão 100ms).
+2. `src/lib/timeline.ts`: fps↔ms, clamp, `durationsOf`, `totalDurationMs`, `frameIndexAtTime`, `moveIdTo`.
+3. Migração preenche legados pelo fps da ação (timing antigo preservado); idempotente.
+4. Copiar/recortar/colar frames (botões + Ctrl+C/X/V), colar após o atual, multi-colar, tudo com undo.
+5. Drag-reorder no strip (drop = 1 undo); step ⏮/⏭ na UI e nas setas (store `stepFrame`).
+6. Editor de ms do frame atual (commit no blur/Enter, sem spam de undo); badge `·ms` no thumb ativo.
+7. FPS virou base: slider carimba 1000/fps ms em TODOS os frames (1 entrada coalescida).
+8. Playback (`AnimatedSprite`), prévia e GIF usam duração por frame; JSON/pack.json trazem `durationsMs`.
+9. Fix: excluir/recortar o atual seleciona o vizinho (antes pulava p/ o 1º).
+10. Testes: `timeline` (13) + `store/timeline` (9) — suíte em 74/74.

@@ -5,6 +5,7 @@ import {
 } from '../types';
 import { applyVariationToColor } from './color';
 import { compositeStack } from './layers';
+import { clampMs, durationsOf, fpsToMs } from './timeline';
 
 /* ------------------------------- render base ------------------------------ */
 
@@ -154,13 +155,16 @@ export function buildMetadata(
   rects: SheetRect[],
   fps: number,
   layers: Array<{ name: string; visible: boolean; opacity: number }> = [],
+  durationsMs: number[] = [],
 ): object {
+  const dur = (i: number) => clampMs(durationsMs[i] ?? fpsToMs(fps));
   switch (engine) {
     case 'phaser': {
       const frames: Record<string, object> = {};
       names.forEach((n, i) => {
         const r = rects[i];
         frames[n] = {
+          durationMs: dur(i),
           frame: { x: r.x, y: r.y, w: r.w, h: r.h },
           rotated: false,
           trimmed: false,
@@ -175,25 +179,25 @@ export function buildMetadata(
     }
     case 'unity': {
       return {
-        frames: names.map((n, i) => ({ name: n, fps, rect: { ...rects[i] } })),
+        frames: names.map((n, i) => ({ name: n, fps, durationMs: dur(i), rect: { ...rects[i] } })),
         meta: { app: 'PixelForge Studio', image: imageFile, sheetSize: { w: sheetW, h: sheetH }, note: 'Importe como Sprite (Multiple) e fatie pela grade, ou use estes rects.', layers },
       };
     }
     case 'godot': {
       return {
-        frames: names.map((n, i) => ({ name: n, ...rects[i] })),
+        frames: names.map((n, i) => ({ name: n, durationMs: dur(i), ...rects[i] })),
         meta: { app: 'PixelForge Studio', image: imageFile, sheetSize: { w: sheetW, h: sheetH }, fps, note: 'Use AtlasTexture com estes region rects, ou AnimatedSprite2D com SpriteFrames.', layers },
       };
     }
     case 'gamemaker': {
       return {
-        frames: names.map((n, i) => ({ name: n, ...rects[i] })),
+        frames: names.map((n, i) => ({ name: n, durationMs: dur(i), ...rects[i] })),
         meta: { app: 'PixelForge Studio', image: imageFile, fps, note: 'Importe a strip na ordem dos frames (esquerda -> direita, cima -> baixo).', layers },
       };
     }
     default: {
       return {
-        frames: names.map((n, i) => ({ name: n, ...rects[i] })),
+        frames: names.map((n, i) => ({ name: n, durationMs: dur(i), ...rects[i] })),
         meta: { app: 'PixelForge Studio', image: imageFile, sheetSize: { w: sheetW, h: sheetH }, frameSize: { w: frameW, h: frameH }, fps, layers },
       };
     }
@@ -207,7 +211,7 @@ export function encodeGif(
 ): Uint8Array {
   const w = project.width, h = project.height;
   const gif = GIFEncoder();
-  const delay = Math.max(20, Math.round(1000 / Math.max(1, fps)));
+  const delays = frames.map((f) => clampMs(f.durationMs ?? fpsToMs(fps)));
   const datas: Uint8ClampedArray[] = frames.map((f) => {
     const c = renderFrameToCanvas(project, f, { scale, variation });
     return c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data;
@@ -238,7 +242,7 @@ export function encodeGif(
     }
     gif.writeFrame(index, width, height, {
       palette,
-      delay,
+      delay: delays[i],
       transparent: true,
       transparentIndex,
       repeat: i === 0 ? 0 : undefined,
@@ -306,6 +310,7 @@ export async function buildPackZip(project: ProjectData, opts: PackOpts): Promis
             project.width * opts.scale, project.height * opts.scale,
             frameNames, rects, anim.fps,
             project.layers.map((l) => ({ name: l.name, visible: l.visible, opacity: l.opacity })),
+            durationsOf(anim, project.frames),
           );
           folder.file(`${base}.json`, JSON.stringify(meta, null, 2));
         }
@@ -334,6 +339,7 @@ export async function buildPackZip(project: ProjectData, opts: PackOpts): Promis
 
     manifestAnims.push({
       name: anim.name, fps: anim.fps, frames: frames.length,
+      durationsMs: durationsOf(anim, project.frames),
       variations: combos.map((c) => c.name),
     });
   }

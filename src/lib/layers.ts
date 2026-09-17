@@ -1,4 +1,5 @@
-import { Frame, Layer, ProjectData, uid } from '../types';
+import { DEFAULT_FRAME_MS, Frame, Layer, ProjectData, uid } from '../types';
+import { clampMs, fpsToMs } from './timeline';
 import { emptyCells } from './pixels';
 
 /**
@@ -10,8 +11,8 @@ export function createLayer(name: string, opacity = 100): Layer {
   return { id: uid('ly'), name, visible: true, locked: false, opacity };
 }
 
-export function makeFrame(layerId: string, cells: string[]): Frame {
-  return { id: uid('fr'), cels: { [layerId]: cells } };
+export function makeFrame(layerId: string, cells: string[], durationMs = DEFAULT_FRAME_MS): Frame {
+  return { id: uid('fr'), cels: { [layerId]: cells }, durationMs: clampMs(durationMs) };
 }
 
 export function layerById(project: ProjectData, id: string | null): Layer | undefined {
@@ -83,18 +84,27 @@ export function flattenCells(project: ProjectData, frame: Frame): string[] {
 export function migrateProject(p: ProjectData): ProjectData {
   const raw = p as unknown as {
     layers?: Layer[];
-    frames: Record<string, { id: string; cels?: Record<string, string[]>; cells?: string[] }>;
+    frames: Record<string, { id: string; cels?: Record<string, string[]>; cells?: string[]; durationMs?: number }>;
   };
+  // fps da primeira ação que contém o frame -> preserva o timing de projetos legados
+  const fpsOf = new Map<string, number>();
+  for (const a of p.animations ?? []) {
+    for (const fid of a.frameIds ?? []) {
+      if (!fpsOf.has(fid)) fpsOf.set(fid, a.fps);
+    }
+  }
+  const legacyMs = (id: string, v: number | undefined) =>
+    typeof v === 'number' ? clampMs(v) : fpsOf.has(id) ? fpsToMs(fpsOf.get(id)!) : DEFAULT_FRAME_MS;
   if (raw.layers && raw.layers.length > 0) {
     let changed = false;
     const frames: Record<string, Frame> = {};
     for (const [id, f] of Object.entries(raw.frames)) {
       if (f.cels) {
-        const ensured = ensureFrameCels({ ...p, layers: raw.layers }, { id, cels: f.cels });
+        const ensured = ensureFrameCels({ ...p, layers: raw.layers }, { id, cels: f.cels, durationMs: legacyMs(id, f.durationMs) });
         frames[id] = ensured;
-        if (ensured.cels !== f.cels) changed = true;
+        if (ensured.cels !== f.cels || f.durationMs === undefined) changed = true;
       } else {
-        frames[id] = { id, cels: { [raw.layers[0].id]: f.cells ?? emptyCells(p.width, p.height) } };
+        frames[id] = { id, cels: { [raw.layers[0].id]: f.cells ?? emptyCells(p.width, p.height) }, durationMs: legacyMs(id, f.durationMs) };
         changed = true;
       }
     }
@@ -107,6 +117,7 @@ export function migrateProject(p: ProjectData): ProjectData {
     frames[id] = {
       id,
       cels: { [layer.id]: f.cels ? (Object.values(f.cels)[0] ?? emptyCells(p.width, p.height)) : (f.cells ?? emptyCells(p.width, p.height)) },
+      durationMs: legacyMs(id, f.durationMs),
     };
   }
   return { ...p, layers: [layer], frames };

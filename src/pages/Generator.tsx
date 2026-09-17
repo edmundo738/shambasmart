@@ -13,6 +13,7 @@ import { useProjects } from '../store/projects';
 import { buildPackZip, downloadBlob, slugify } from '../lib/exporters';
 import { Animation, Frame, ProjectData, uid } from '../types';
 import { createLayer, makeFrame } from '../lib/layers';
+import { fpsToMs } from '../lib/timeline';
 
 const KIND_ICONS: Record<SpriteKind, React.ReactNode> = {
   personagem: <PersonStanding size={22} />,
@@ -100,7 +101,7 @@ export default function Generator() {
     const frames: Record<string, Frame> = {};
     const anims: Animation[] = sprite.actions.map((a) => {
       const frameIds = a.frames.map((cells) => {
-        const f: Frame = makeFrame(layer.id, cells);
+        const f: Frame = makeFrame(layer.id, cells, fpsToMs(a.fps));
         frames[f.id] = f;
         return f.id;
       });

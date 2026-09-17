@@ -14,7 +14,14 @@ export interface Frame {
   id: string;
   /** cel por layer: layerId -> pixels (frame × layer = cel) */
   cels: Record<string, Cell[]>;
+  /** duração do frame em ms — fonte da verdade do timing (playback, preview, GIF) */
+  durationMs: number;
 }
+
+/** Timing padrão (100ms = 10fps) e limites do editor. */
+export const DEFAULT_FRAME_MS = 100;
+export const MIN_FRAME_MS = 20;
+export const MAX_FRAME_MS = 2000;
 
 export interface Animation {
   id: string;

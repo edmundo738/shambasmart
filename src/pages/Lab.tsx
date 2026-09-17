@@ -12,6 +12,7 @@ import { useStudio } from '../store/studio';
 import { useProjects } from '../store/projects';
 import { Animation, Frame, ProjectData, uid } from '../types';
 import { createLayer, makeFrame } from '../lib/layers';
+import { fpsToMs } from '../lib/timeline';
 
 function Slider({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
   return (
@@ -83,7 +84,7 @@ export default function Lab() {
     const anims: Animation[] = enabledActions.map((def) => {
       const cells = generateActionFrames(spec, def.id, actions[def.id].frames, params);
       const frameIds = cells.map((c) => {
-        const f: Frame = makeFrame(layer.id, c);
+        const f: Frame = makeFrame(layer.id, c, fpsToMs(def.fps));
         frames[f.id] = f;
         return f.id;
       });
@@ -132,7 +133,7 @@ export default function Lab() {
     const anims: Animation[] = enabledActions.map((def) => {
       const cells = generateActionFrames(spec, def.id, actions[def.id].frames, params);
       const frameIds = cells.map((c) => {
-        const f: Frame = makeFrame(lid, c);
+        const f: Frame = makeFrame(lid, c, fpsToMs(def.fps));
         frames[f.id] = f;
         return f.id;
       });

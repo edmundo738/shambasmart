@@ -1,4 +1,5 @@
-import { Animation, Frame, Layer, uid } from '../types';
+import { Animation, DEFAULT_FRAME_MS, Frame, Layer, uid } from '../types';
+import { fpsToMs } from './timeline';
 import { createLayer } from './layers';
 import { emptyCells } from './pixels';
 
@@ -29,7 +30,7 @@ class Painter {
     }
   }
   frame(layerId: string): Frame {
-    return { id: uid('fr'), cels: { [layerId]: [...this.cells] } };
+    return { id: uid('fr'), cels: { [layerId]: [...this.cells] }, durationMs: DEFAULT_FRAME_MS };
   }
   clear() {
     this.cells = emptyCells(W, H);
@@ -37,6 +38,8 @@ class Painter {
 }
 
 function makeAnim(name: string, fps: number, frames: Frame[]): Animation {
+  const ms = fpsToMs(fps);
+  for (const f of frames) f.durationMs = ms;
   return { id: uid('an'), name, fps, frameIds: frames.map((f) => f.id) };
 }
 

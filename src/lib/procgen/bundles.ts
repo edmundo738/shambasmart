@@ -1,6 +1,7 @@
 import JSZip from 'jszip';
 import { Animation, Frame, ProjectData, uid } from '../../types';
 import { createLayer, makeFrame } from '../layers';
+import { fpsToMs } from '../timeline';
 import { buildPackZip, slugify } from '../exporters';
 import { GeneratedSprite, SpriteKind, generateSprite } from './sprites';
 import { StyleId } from './styles';
@@ -90,7 +91,7 @@ export function spriteToProjectData(sprite: GeneratedSprite, size: number, bundl
   const frames: Record<string, Frame> = {};
   const anims: Animation[] = sprite.actions.map((a) => {
     const frameIds = a.frames.map((cells) => {
-      const f: Frame = makeFrame(layer.id, cells);
+      const f: Frame = makeFrame(layer.id, cells, fpsToMs(a.fps));
       frames[f.id] = f;
       return f.id;
     });

@@ -3,6 +3,7 @@ import {
   Animation, Frame, Layer, ORIGINAL_VARIATION_ID, ProjectData, SelRect, ToolId, Variation, uid,
 } from '../types';
 import { emptyCells, moveRect } from '../lib/pixels';
+import { clampMs, fpsToMs, frameMs, moveIdTo } from '../lib/timeline';
 import { createLayer, makeFrame, migrateProject } from '../lib/layers';
 import { normalizeHex } from '../lib/color';
 import { TEMPLATES } from '../lib/templates';
@@ -110,6 +111,13 @@ interface StudioState {
   duplicateFrame: (id: string) => void;
   deleteFrame: (id: string) => void;
   moveFrame: (id: string, dir: -1 | 1) => void;
+  moveFrameTo: (id: string, toIndex: number) => void;
+  stepFrame: (dir: -1 | 1) => void;
+  setFrameDuration: (id: string, ms: number) => void;
+  frameClipboard: Frame[] | null;
+  copyFrame: (id: string) => void;
+  cutFrame: (id: string) => void;
+  pasteFrame: () => void;
   clearFrame: (id: string) => void;
 
   // animações
@@ -216,6 +224,7 @@ export const useStudio = create<StudioState>((set, get) => ({
   currentFrameId: null,
   currentLayerId: null,
   selection: null,
+  frameClipboard: null,
   variationId: ORIGINAL_VARIATION_ID,
   past: [],
   future: [],
@@ -229,6 +238,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     currentFrameId: project.animations[0]?.frameIds[0] ?? null,
     currentLayerId: project.layers[project.layers.length - 1]?.id ?? null,
     selection: null,
+    frameClipboard: null,
     variationId: ORIGINAL_VARIATION_ID,
     past: [],
     future: [],
@@ -239,7 +249,7 @@ export const useStudio = create<StudioState>((set, get) => ({
 
   newEmptyProject: (name, w, h) => {
     const layer = createLayer('Camada 1');
-    const frame: Frame = makeFrame(layer.id, emptyCells(w, h));
+    const frame: Frame = makeFrame(layer.id, emptyCells(w, h), fpsToMs(8));
     const anim: Animation = { id: uid('an'), name: 'idle', fps: 8, frameIds: [frame.id] };
     const now = Date.now();
     const project: ProjectData = {
@@ -490,7 +500,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     const anim = currentAnim(s.project, s.currentAnimationId);
     if (!anim) return {};
     const hist = pushHistory(s);
-    const frame: Frame = { id: uid('fr'), cels: emptyCels(s.project) };
+    const frame: Frame = { id: uid('fr'), cels: emptyCels(s.project), durationMs: fpsToMs(anim.fps) };
     const curIdx = s.currentFrameId ? anim.frameIds.indexOf(s.currentFrameId) : anim.frameIds.length - 1;
     const frameIds = [...anim.frameIds];
     frameIds.splice(curIdx + 1, 0, frame.id);
@@ -513,7 +523,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     const src = s.project.frames[id];
     if (!anim || !src || !anim.frameIds.includes(id)) return {};
     const hist = pushHistory(s);
-    const frame: Frame = { id: uid('fr'), cels: cloneCels(src, s.project) };
+    const frame: Frame = { id: uid('fr'), cels: cloneCels(src, s.project), durationMs: frameMs(src) };
     const frameIds = [...anim.frameIds];
     frameIds.splice(frameIds.indexOf(id) + 1, 0, frame.id);
     const animations = s.project.animations.map((a) => (a.id === anim.id ? { ...a, frameIds } : a));
@@ -535,7 +545,8 @@ export const useStudio = create<StudioState>((set, get) => ({
     // remove o frame se não for usado por outra animação
     const stillUsed = animations.some((a) => a.frameIds.includes(id));
     if (!stillUsed) delete frames[id];
-    const currentFrameId = s.currentFrameId === id ? frameIds[Math.max(0, frameIds.indexOf(id) - 0)] ?? frameIds[0] : s.currentFrameId;
+    const delIdx = anim.frameIds.indexOf(id);
+    const currentFrameId = s.currentFrameId === id ? frameIds[Math.min(delIdx, frameIds.length - 1)] : s.currentFrameId;
     return {
       ...hist,
       project: { ...s.project, frames, animations, updatedAt: Date.now() },
@@ -555,6 +566,90 @@ export const useStudio = create<StudioState>((set, get) => ({
     [frameIds[i], frameIds[j]] = [frameIds[j], frameIds[i]];
     const animations = s.project.animations.map((a) => (a.id === anim.id ? { ...a, frameIds } : a));
     return { ...hist, project: { ...s.project, animations, updatedAt: Date.now() } };
+  }),
+
+  moveFrameTo: (id, toIndex) => set((s) => {
+    if (!s.project) return {};
+    const anim = currentAnim(s.project, s.currentAnimationId);
+    if (!anim || !anim.frameIds.includes(id)) return {};
+    const frameIds = moveIdTo(anim.frameIds, id, toIndex);
+    if (frameIds.join() === anim.frameIds.join()) return {}; // sem mudança: sem undo
+    const hist = pushHistory(s);
+    const animations = s.project.animations.map((a) => (a.id === anim.id ? { ...a, frameIds } : a));
+    return { ...hist, project: { ...s.project, animations, updatedAt: Date.now() } };
+  }),
+
+  stepFrame: (dir) => set((s) => {
+    const anim = s.project ? currentAnim(s.project, s.currentAnimationId) : undefined;
+    if (!s.project || !anim || !anim.frameIds.length) return {};
+    const i = anim.frameIds.indexOf(s.currentFrameId ?? '');
+    const n = anim.frameIds.length;
+    const next = anim.frameIds[((i < 0 ? 0 : i + dir) % n + n) % n];
+    return { currentAnimationId: anim.id, currentFrameId: next };
+  }),
+
+  setFrameDuration: (id, ms) => set((s) => {
+    if (!s.project) return {};
+    const frame = s.project.frames[id];
+    const value = clampMs(ms);
+    if (!frame || frame.durationMs === value) return {};
+    const hist = pushHistory(s);
+    return {
+      ...hist,
+      project: {
+        ...s.project,
+        frames: { ...s.project.frames, [id]: { ...frame, durationMs: value } },
+        updatedAt: Date.now(),
+      },
+    };
+  }),
+
+  copyFrame: (id) => set((s) => {
+    if (!s.project) return {};
+    const f = s.project.frames[id];
+    if (!f) return {};
+    return { frameClipboard: [{ ...f, cels: cloneCels(f, s.project), durationMs: frameMs(f) }] };
+  }),
+
+  cutFrame: (id) => set((s) => {
+    if (!s.project) return {};
+    const anim = currentAnim(s.project, s.currentAnimationId);
+    const f = s.project.frames[id];
+    if (!anim || !f || !anim.frameIds.includes(id) || anim.frameIds.length <= 1) return {};
+    const hist = pushHistory(s);
+    const frameIds = anim.frameIds.filter((fid) => fid !== id);
+    const animations = s.project.animations.map((a) => (a.id === anim.id ? { ...a, frameIds } : a));
+    const frames = { ...s.project.frames };
+    if (!animations.some((a) => a.frameIds.includes(id))) delete frames[id];
+    const idx = anim.frameIds.indexOf(id);
+    return {
+      ...hist,
+      frameClipboard: [{ ...f, cels: cloneCels(f, s.project), durationMs: frameMs(f) }],
+      project: { ...s.project, frames, animations, updatedAt: Date.now() },
+      currentFrameId: s.currentFrameId === id ? frameIds[Math.min(idx, frameIds.length - 1)] : s.currentFrameId,
+    };
+  }),
+
+  pasteFrame: () => set((s) => {
+    if (!s.project || !s.frameClipboard?.length) return {};
+    const anim = currentAnim(s.project, s.currentAnimationId);
+    if (!anim) return {};
+    const hist = pushHistory(s);
+    const frames = { ...s.project.frames };
+    const frameIds = [...anim.frameIds];
+    const curIdx = s.currentFrameId ? frameIds.indexOf(s.currentFrameId) : frameIds.length - 1;
+    const pasted = s.frameClipboard.map((f) => {
+      const copy: Frame = { id: uid('fr'), cels: cloneCels(f, s.project!), durationMs: frameMs(f) };
+      frames[copy.id] = copy;
+      return copy.id;
+    });
+    frameIds.splice(curIdx + 1, 0, ...pasted);
+    const animations = s.project.animations.map((a) => (a.id === anim.id ? { ...a, frameIds } : a));
+    return {
+      ...hist,
+      project: { ...s.project, frames, animations, updatedAt: Date.now() },
+      currentFrameId: pasted[0],
+    };
   }),
 
   clearFrame: (id) => set((s) => {
@@ -577,7 +672,7 @@ export const useStudio = create<StudioState>((set, get) => ({
   addAnimation: (name) => set((s) => {
     if (!s.project) return {};
     const hist = pushHistory(s);
-    const frame: Frame = { id: uid('fr'), cels: emptyCels(s.project) };
+    const frame: Frame = { id: uid('fr'), cels: emptyCels(s.project), durationMs: fpsToMs(8) };
     const count = s.project.animations.length + 1;
     const anim: Animation = { id: uid('an'), name: name || `acao_${count}`, fps: 8, frameIds: [frame.id] };
     return {
@@ -631,7 +726,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     const frames = { ...s.project.frames };
     const frameIds = src.frameIds.map((fid) => {
       const f = frames[fid];
-      const copy: Frame = { id: uid('fr'), cels: cloneCels(f, s.project!) };
+      const copy: Frame = { id: uid('fr'), cels: cloneCels(f, s.project!), durationMs: frameMs(f) };
       frames[copy.id] = copy;
       return copy.id;
     });
@@ -654,7 +749,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     const frameIds = framesCells.map((cells) => {
       const cels = emptyCels(s.project!);
       if (target) cels[target.id] = [...cells];
-      const f: Frame = { id: uid('fr'), cels };
+      const f: Frame = { id: uid('fr'), cels, durationMs: fpsToMs(fps) };
       frames[f.id] = f;
       return f.id;
     });
@@ -673,12 +768,22 @@ export const useStudio = create<StudioState>((set, get) => ({
 
   setAnimFps: (id, fps) => set((s) => {
     if (!s.project) return {};
+    const anim = s.project.animations.find((a) => a.id === id);
+    if (!anim) return {};
+    const value = Math.max(1, Math.min(60, Math.round(fps)));
+    const ms = fpsToMs(value);
     const hist = pushHistoryLive(s);
+    const frames = { ...s.project.frames };
+    for (const fid of anim.frameIds) {
+      const f = frames[fid];
+      if (f) frames[fid] = { ...f, durationMs: ms };
+    }
     return {
       ...hist,
       project: {
         ...s.project,
-        animations: s.project.animations.map((a) => (a.id === id ? { ...a, fps: Math.max(1, Math.min(60, fps)) } : a)),
+        frames,
+        animations: s.project.animations.map((a) => (a.id === id ? { ...a, fps: value } : a)),
         updatedAt: Date.now(),
       },
       dirty: true,

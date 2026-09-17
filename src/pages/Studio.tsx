@@ -109,6 +109,19 @@ export default function Studio() {
         }
         return;
       }
+      if ((e.ctrlKey || e.metaKey) && ['c', 'x', 'v'].includes(e.key.toLowerCase())) {
+        const k = e.key.toLowerCase();
+        const fid = st.currentFrameId;
+        if (k === 'v' && st.frameClipboard?.length) {
+          e.preventDefault();
+          st.pasteFrame();
+        } else if (fid && (k === 'c' || k === 'x')) {
+          e.preventDefault();
+          if (k === 'c') st.copyFrame(fid);
+          else st.cutFrame(fid);
+        }
+        return;
+      }
       switch (e.key.toLowerCase()) {
         case 'b': st.setTool('brush'); break;
         case 'e': st.setTool('eraser'); break;
@@ -155,16 +168,8 @@ export default function Studio() {
             break;
           }
           if (e.key.toLowerCase() === 'arrowup' || e.key.toLowerCase() === 'arrowdown') break;
-          const p = st.project;
-          const anim = p?.animations.find((a) => a.id === (st.currentAnimationId ?? p?.animations[0]?.id));
-          if (!p || !anim || !anim.frameIds.length) break;
           e.preventDefault();
-          const i = anim.frameIds.indexOf(st.currentFrameId ?? '');
-          const n = anim.frameIds.length;
-          const next = e.key.toLowerCase() === 'arrowright'
-            ? anim.frameIds[(i + 1 + n) % n]
-            : anim.frameIds[(i - 1 + n) % n];
-          st.select(anim.id, next);
+          st.stepFrame(e.key.toLowerCase() === 'arrowright' ? 1 : -1);
           break;
         }
       }

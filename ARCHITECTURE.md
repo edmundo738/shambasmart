@@ -118,8 +118,9 @@ obrigatório em `docs/BENCHMARK.md` (referência × atual × alvo por sistema).
   idempotente + composite com alpha no render/export + layers no undo (36 testes verdes)
 - [x] **FASE B2 — Seleção + paleta**: seleção retangular + mover, undo em paleta,
   importar/exportar `.gpl`
-- [ ] **FASE C — Animation**: copiar/colar frames, drag-reorder, duração por frame,
-  onion prev/next configurável, ping-pong/reverso, preview 1x
+- [x] **FASE C1 — Timeline core**: duração por frame (ms), copiar/recortar/colar,
+  drag-reorder, step, FPS base carimba todos, playback/export por duração (74 testes)
+- [ ] **FASE C2 — Playback**: ping-pong/reverso, onion prev/next configurável, preview 1x
 - [ ] **FASE D — Rig**: bones editáveis (FK correto, coordenadas local/pai/mundo),
   render pixel-snapped, anchors/hitboxes no export
 - [ ] **FASE E — IK**: two-bone + FABRIK estável com limites, foot/hand targets
