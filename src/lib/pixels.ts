@@ -1,5 +1,7 @@
 /** Operações de desenho em grade de pixels */
 
+import { SelRect } from '../types';
+
 export function emptyCells(w: number, h: number): string[] {
   return new Array(w * h).fill('');
 }
@@ -153,6 +155,38 @@ export function pixelPerfectStep(
     return { trail: [...trail.slice(0, -1), next], paint: [next], unpaint: [last] };
   }
   return { trail: [...trail, next], paint: [next], unpaint: [] };
+}
+
+/**
+ * Move o conteúdo de um retângulo: recorta na origem, cola deslocado (clipado).
+ * Só pixels opacos colam — transparente não apaga o destino.
+ * Puro: devolve novas células + novo retângulo lógico (pode sair do canvas).
+ */
+export function moveRect(
+  cells: string[], w: number, h: number,
+  rect: SelRect, dx: number, dy: number,
+): { cells: string[]; rect: SelRect } {
+  const x0 = Math.max(0, Math.min(rect.x0, rect.x1));
+  const y0 = Math.max(0, Math.min(rect.y0, rect.y1));
+  const x1 = Math.min(w - 1, Math.max(rect.x0, rect.x1));
+  const y1 = Math.min(h - 1, Math.max(rect.y0, rect.y1));
+  const out = [...cells];
+  const floating: Array<{ x: number; y: number; c: string }> = [];
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      const c = out[y * w + x];
+      if (c) floating.push({ x, y, c });
+      out[y * w + x] = '';
+    }
+  }
+  for (const { x, y, c } of floating) {
+    const nx = x + dx, ny = y + dy;
+    if (nx >= 0 && ny >= 0 && nx < w && ny < h) out[ny * w + nx] = c;
+  }
+  return {
+    cells: out,
+    rect: { x0: rect.x0 + dx, y0: rect.y0 + dy, x1: rect.x1 + dx, y1: rect.y1 + dy },
+  };
 }
 
 /** Conta cores usadas ordenadas por frequência */

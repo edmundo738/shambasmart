@@ -189,6 +189,13 @@ Legenda de status: ✅ sólido · 🟡 funcional mas amador · 🔴 ausente/frá
 6. Undo/redo inclui estrutura das layers; metadata do ZIP lista as layers.
 7. Testes `tests/pixel/layers.test.ts` (12 testes: composite, migração, idempotência).
 
-## FASE B2 (próxima)
+## Veredito FASE B2 (entregue)
 
-Seleção retangular + mover (arrastar, setas, Esc), undo em paleta/variações, `.gpl`.
+1. Seleção retangular (`SelRect` normalizado, inclusivo) na camada atual, com lock respeitado.
+2. Marching ants em overlay (tracejado animado, ferramenta `M`); laço elástico no marquee.
+3. Mover: arrasto interno = 1 undo (`beginStroke` + `moveSelectionLive`); Esc reverte pixels + retângulo.
+4. Setas movem 1px (Shift = 8px); Delete/Backspace limpa dentro; clique fora/Esc desseleciona.
+5. `moveRect` puro: recorta origem, cola só opaco (transparente nunca apaga), recorta bordas.
+6. Undo/redo inclui paleta + variações + renomeação/FPS; sliders coalescidos (~1.2s, sem passos vazios).
+7. `.gpl` (GIMP): importar/exportar no PalettePanel; parser tolerante, roundtrip testado.
+8. Testes: `select` (6), `gpl` (5), `store/history` (8) — suíte em 55/55.

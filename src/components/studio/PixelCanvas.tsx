@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useStudio } from '../../store/studio';
+import { SelRect } from '../../types';
+
+function normSel(r: SelRect): SelRect {
+  return { x0: Math.min(r.x0, r.x1), y0: Math.min(r.y0, r.y1), x1: Math.max(r.x0, r.x1), y1: Math.max(r.y0, r.y1) };
+}
+function pointInSel(x: number, y: number, r: SelRect): boolean {
+  const n = normSel(r);
+  return x >= n.x0 && x <= n.x1 && y >= n.y0 && y <= n.y1;
+}
 import {
   brushIndices, ellipsePoints, emptyCells, floodFill, idx, inBounds, linePoints, mirrorPoints,
   pixelPerfectStep, rectPoints,
@@ -13,6 +22,7 @@ export default function PixelCanvas() {
     drawing: boolean; startX: number; startY: number; erase: boolean;
     lastX: number; lastY: number; lastKey: string;
     trail: Array<[number, number]>; orig: string[] | null;
+    mode: 'paint' | 'shape' | 'marquee' | 'move'; moved: boolean; base: SelRect | null;
   } | null>(null);
 
   const project = useStudio((s) => s.project);
@@ -26,6 +36,7 @@ export default function PixelCanvas() {
   const showGrid = useStudio((s) => s.showGrid);
   const onionSkin = useStudio((s) => s.onionSkin);
   const zoom = useStudio((s) => s.zoom);
+  const selection = useStudio((s) => s.selection);
 
   const anim = project?.animations.find((a) => a.id === currentAnimationId) ?? project?.animations[0];
   const frame = currentFrameId ? project?.frames[currentFrameId] : undefined;
@@ -186,6 +197,87 @@ export default function PixelCanvas() {
     ctx.clearRect(0, 0, overlay.width, overlay.height);
   }, []);
 
+  /** Marching ants da seleção (duplo tracejado preto/branco). */
+  const drawAnts = useCallback((offset: number) => {
+    const overlay = overlayRef.current;
+    const st = useStudio.getState();
+    const sel = st.selection;
+    const pr = st.project;
+    if (!overlay || !pr || !sel) return;
+    overlay.width = pr.width * st.zoom;
+    overlay.height = pr.height * st.zoom;
+    const ctx = overlay.getContext('2d')!;
+    ctx.imageSmoothingEnabled = false;
+    const n = normSel(sel);
+    const x0 = Math.max(0, n.x0) * st.zoom;
+    const y0 = Math.max(0, n.y0) * st.zoom;
+    const x1 = (Math.min(pr.width - 1, n.x1) + 1) * st.zoom;
+    const y1 = (Math.min(pr.height - 1, n.y1) + 1) * st.zoom;
+    if (x1 <= x0 || y1 <= y0) return;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.lineDashOffset = -offset;
+    ctx.strokeStyle = 'rgba(0,0,0,0.9)';
+    ctx.strokeRect(x0 + 0.5, y0 + 0.5, x1 - x0 - 1, y1 - y0 - 1);
+    ctx.lineDashOffset = -offset + 4;
+    ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+    ctx.strokeRect(x0 + 0.5, y0 + 0.5, x1 - x0 - 1, y1 - y0 - 1);
+    ctx.setLineDash([]);
+  }, []);
+
+  /** Laço elástico durante o arrasto do marquee. */
+  const drawMarqueeLive = useCallback((ax: number, ay: number, bx: number, by: number) => {
+    const overlay = overlayRef.current;
+    const st = useStudio.getState();
+    const pr = st.project;
+    if (!overlay || !pr) return;
+    overlay.width = pr.width * st.zoom;
+    overlay.height = pr.height * st.zoom;
+    const ctx = overlay.getContext('2d')!;
+    const n = normSel({ x0: ax, y0: ay, x1: bx, y1: by });
+    const x0 = n.x0 * st.zoom, y0 = n.y0 * st.zoom;
+    const rw = (n.x1 - n.x0 + 1) * st.zoom, rh = (n.y1 - n.y0 + 1) * st.zoom;
+    ctx.fillStyle = 'rgba(99,102,241,0.15)';
+    ctx.fillRect(x0, y0, rw, rh);
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = '#fff';
+    ctx.strokeRect(x0 + 0.5, y0 + 0.5, rw - 1, rh - 1);
+    ctx.setLineDash([]);
+  }, []);
+
+  /* Ants: estáticas sempre que há seleção; animadas com a ferramenta select. */
+  useEffect(() => {
+    if (!selection) {
+      if (!drag.current?.drawing) clearOverlay();
+      return;
+    }
+    drawAnts(0);
+    if (tool !== 'select') return;
+    let off = 0;
+    const t = setInterval(() => { off = (off + 2) % 16; drawAnts(off); }, 120);
+    return () => clearInterval(t);
+  }, [selection, zoom, tool, clearOverlay, drawAnts]);
+
+  /* Esc durante marquee/arrasto: cancela (arrasto reverte pixels + retângulo). */
+  useEffect(() => {
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      const d = drag.current;
+      if (!d || (d.mode !== 'move' && d.mode !== 'marquee')) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const st = useStudio.getState();
+      if (d.mode === 'move' && d.moved) st.undo();
+      st.setSelection(d.base ? { ...d.base } : null);
+      drag.current = null;
+      clearOverlay();
+      drawAnts(0);
+    };
+    window.addEventListener('keydown', onEsc, true);
+    return () => window.removeEventListener('keydown', onEsc, true);
+  }, [clearOverlay, drawAnts]);
+
   /* ------------------------------ interações ------------------------------ */
   const onPointerDown = (e: React.PointerEvent) => {
     const cell = cellFromEvent(e);
@@ -198,6 +290,26 @@ export default function PixelCanvas() {
     if (st.tool === 'picker' || e.altKey) {
       const c = flattenCells(project, frame)[idx(x, y, project.width)];
       if (c) st.setColor(c);
+      return;
+    }
+
+    if (st.tool === 'select') {
+      const sel = st.selection;
+      if (sel && pointInSel(x, y, sel)) {
+        const layer = project.layers.find((l) => l.id === st.currentLayerId) ?? project.layers[project.layers.length - 1];
+        if (layer?.locked) return;
+        st.beginStroke(); // baseline: arrasto inteiro = 1 undo
+        drag.current = {
+          drawing: true, startX: x, startY: y, erase: false, lastX: x, lastY: y,
+          lastKey: '', trail: [], orig: null, mode: 'move', moved: false, base: { ...sel },
+        };
+      } else {
+        st.setSelection(null);
+        drag.current = {
+          drawing: true, startX: x, startY: y, erase: false, lastX: x, lastY: y,
+          lastKey: '', trail: [], orig: null, mode: 'marquee', moved: false, base: null,
+        };
+      }
       return;
     }
 
@@ -217,14 +329,14 @@ export default function PixelCanvas() {
     }
 
     if (st.tool === 'line' || st.tool === 'rect' || st.tool === 'ellipse') {
-      drag.current = { drawing: true, startX: x, startY: y, erase, lastX: x, lastY: y, lastKey: '', trail: [], orig: null };
+      drag.current = { drawing: true, startX: x, startY: y, erase, lastX: x, lastY: y, lastKey: '', trail: [], orig: null, mode: 'shape', moved: false, base: null };
       drawOverlayShape(x, y, e.shiftKey);
       return;
     }
 
     st.beginStroke();
     // snapshot grátis: paint() é imutável, então a referência congela o pré-traço
-    drag.current = { drawing: true, startX: x, startY: y, erase, lastX: x, lastY: y, lastKey: '', trail: [], orig: cel };
+    drag.current = { drawing: true, startX: x, startY: y, erase, lastX: x, lastY: y, lastKey: '', trail: [], orig: cel, mode: 'paint', moved: false, base: null };
     applyStrokeTo(x, y, erase);
   };
 
@@ -235,6 +347,19 @@ export default function PixelCanvas() {
     if (!cell) return;
     const st = useStudio.getState();
     const [x, y] = cell;
+    if (d.mode === 'marquee') {
+      drawMarqueeLive(d.startX, d.startY, x, y);
+      d.moved = x !== d.startX || y !== d.startY;
+      return;
+    }
+    if (d.mode === 'move') {
+      const dx = x - d.lastX, dy = y - d.lastY;
+      if (dx || dy) {
+        st.moveSelectionLive(dx, dy);
+        d.lastX = x; d.lastY = y; d.moved = true;
+      }
+      return;
+    }
     if (st.tool === 'line' || st.tool === 'rect' || st.tool === 'ellipse') {
       drawOverlayShape(x, y, e.shiftKey);
       return;
@@ -247,9 +372,21 @@ export default function PixelCanvas() {
     if (!d?.drawing) return;
     drag.current = null;
     const st = useStudio.getState();
+    if (d.mode === 'marquee') {
+      const cell = cellFromEvent(e);
+      clearOverlay();
+      if (cell && project) {
+        const [x1, y1] = cell;
+        if (x1 === d.startX && y1 === d.startY) st.setSelection(null);
+        else st.setSelection(normSel({ x0: d.startX, y0: d.startY, x1, y1 }));
+      }
+      return;
+    }
+    if (d.mode === 'move') return; // undo único já garantido pelo beginStroke do down
     if (st.tool === 'line' || st.tool === 'rect' || st.tool === 'ellipse') {
       const cell = cellFromEvent(e);
       clearOverlay();
+      drawAnts(0); // restaura ants por baixo do preview da forma
       if (!cell || !project) return;
       const [x1, y1] = cell;
       let pts: Array<[number, number]> = [];

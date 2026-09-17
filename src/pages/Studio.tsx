@@ -87,6 +87,7 @@ export default function Studio() {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return;
+      if (e.defaultPrevented) return; // PixelCanvas já tratou (ex.: Esc cancela arrasto)
       const st = useStudio.getState();
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
@@ -116,6 +117,7 @@ export default function Studio() {
         case 'l': st.setTool('line'); break;
         case 'r': st.setTool('rect'); break;
         case 'o': st.setTool('ellipse'); break;
+        case 'm': st.setTool('select'); break;
         case 'p': st.togglePixelPerfect(); break;
         case 'x': st.toggleMirrorX(); break;
         case 'y': st.toggleMirrorY(); break;
@@ -126,8 +128,33 @@ export default function Studio() {
           st.setPlaying(!st.playing);
           break;
         }
+        case 'delete':
+        case 'backspace': {
+          if (st.tool === 'select' && st.selection) {
+            e.preventDefault();
+            st.deleteSelection();
+          }
+          break;
+        }
+        case 'escape': {
+          if (st.selection) st.setSelection(null);
+          break;
+        }
+        case 'arrowup':
+        case 'arrowdown':
         case 'arrowright':
         case 'arrowleft': {
+          if (st.tool === 'select' && st.selection) {
+            e.preventDefault();
+            const step = e.shiftKey ? 8 : 1;
+            const k = e.key.toLowerCase();
+            st.moveSelection(
+              k === 'arrowright' ? step : k === 'arrowleft' ? -step : 0,
+              k === 'arrowdown' ? step : k === 'arrowup' ? -step : 0,
+            );
+            break;
+          }
+          if (e.key.toLowerCase() === 'arrowup' || e.key.toLowerCase() === 'arrowdown') break;
           const p = st.project;
           const anim = p?.animations.find((a) => a.id === (st.currentAnimationId ?? p?.animations[0]?.id));
           if (!p || !anim || !anim.frameIds.length) break;

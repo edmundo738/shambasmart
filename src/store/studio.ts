@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import {
-  Animation, Frame, Layer, ORIGINAL_VARIATION_ID, ProjectData, ToolId, Variation, uid,
+  Animation, Frame, Layer, ORIGINAL_VARIATION_ID, ProjectData, SelRect, ToolId, Variation, uid,
 } from '../types';
-import { emptyCells } from '../lib/pixels';
+import { emptyCells, moveRect } from '../lib/pixels';
 import { createLayer, makeFrame, migrateProject } from '../lib/layers';
 import { normalizeHex } from '../lib/color';
 import { TEMPLATES } from '../lib/templates';
@@ -11,6 +11,8 @@ interface HistorySnap {
   frames: Record<string, Frame>;
   animations: Animation[];
   layers: Layer[];
+  palette: string[];
+  variations: Variation[];
 }
 
 function snap(project: ProjectData): HistorySnap {
@@ -18,6 +20,8 @@ function snap(project: ProjectData): HistorySnap {
     frames: JSON.parse(JSON.stringify(project.frames)),
     animations: JSON.parse(JSON.stringify(project.animations)),
     layers: JSON.parse(JSON.stringify(project.layers)),
+    palette: [...project.palette],
+    variations: JSON.parse(JSON.stringify(project.variations)),
   };
 }
 
@@ -29,6 +33,12 @@ function restoreAnims(s: HistorySnap): Animation[] {
 }
 function restoreLayers(s: HistorySnap): Layer[] {
   return JSON.parse(JSON.stringify(s.layers));
+}
+function restorePalette(s: HistorySnap): string[] {
+  return [...s.palette];
+}
+function restoreVariations(s: HistorySnap): Variation[] {
+  return JSON.parse(JSON.stringify(s.variations));
 }
 
 interface StudioState {
@@ -82,6 +92,13 @@ interface StudioState {
   toggleLayerLock: (id: string) => void;
   setLayerOpacity: (id: string, opacity: number) => void;
 
+  // seleção
+  selection: SelRect | null;
+  setSelection: (r: SelRect | null) => void;
+  moveSelection: (dx: number, dy: number) => void;
+  moveSelectionLive: (dx: number, dy: number) => void;
+  deleteSelection: () => void;
+
   // pintura
   beginStroke: () => void;
   paint: (indices: number[], color: string | null) => void;
@@ -129,6 +146,36 @@ function pushHistory(state: StudioState): Partial<StudioState> {
   return { past, future: [], dirty: true };
 }
 
+let lastLiveHist = 0;
+/** Histórico coalescido p/ controles contínuos (cor, variação, FPS): 1 entrada por janela. */
+function pushHistoryLive(s: StudioState, windowMs = 1200): Partial<StudioState> {
+  const now = Date.now();
+  if (now - lastLiveHist < windowMs) return { dirty: true };
+  lastLiveHist = now;
+  return pushHistory(s);
+}
+
+function applyMove(
+  s: StudioState, project: ProjectData, selection: SelRect,
+  hist: Partial<StudioState>, dx: number, dy: number,
+): Partial<StudioState> {
+  const layer = currentLayer(project, s.currentLayerId);
+  const frame = project.frames[s.currentFrameId ?? ''];
+  if (!frame) return {};
+  const cel = frame.cels[layer.id] ?? emptyCells(project.width, project.height);
+  const moved = moveRect(cel, project.width, project.height, selection, dx, dy);
+  return {
+    ...hist,
+    project: {
+      ...project,
+      frames: { ...project.frames, [frame.id]: { ...frame, cels: { ...frame.cels, [layer.id]: moved.cells } } },
+      updatedAt: Date.now(),
+    },
+    selection: moved.rect,
+    dirty: true,
+  };
+}
+
 function currentAnim(project: ProjectData, animId: string | null): Animation | undefined {
   return project.animations.find((a) => a.id === animId) ?? project.animations[0];
 }
@@ -168,6 +215,7 @@ export const useStudio = create<StudioState>((set, get) => ({
   currentAnimationId: null,
   currentFrameId: null,
   currentLayerId: null,
+  selection: null,
   variationId: ORIGINAL_VARIATION_ID,
   past: [],
   future: [],
@@ -180,6 +228,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     currentAnimationId: project.animations[0]?.id ?? null,
     currentFrameId: project.animations[0]?.frameIds[0] ?? null,
     currentLayerId: project.layers[project.layers.length - 1]?.id ?? null,
+    selection: null,
     variationId: ORIGINAL_VARIATION_ID,
     past: [],
     future: [],
@@ -347,6 +396,49 @@ export const useStudio = create<StudioState>((set, get) => ({
     };
   }),
 
+  setSelection: (selection) => set({ selection }),
+
+  moveSelection: (dx, dy) => set((s) => {
+    if (!s.project || !s.selection || (!dx && !dy)) return {};
+    const layer = currentLayer(s.project, s.currentLayerId);
+    if (layer.locked) return {};
+    return applyMove(s, s.project, s.selection, pushHistory(s), dx, dy);
+  }),
+
+  moveSelectionLive: (dx, dy) => set((s) => {
+    if (!s.project || !s.selection || (!dx && !dy)) return {};
+    const layer = currentLayer(s.project, s.currentLayerId);
+    if (layer.locked) return {};
+    return applyMove(s, s.project, s.selection, {}, dx, dy);
+  }),
+
+  deleteSelection: () => set((s) => {
+    if (!s.project || !s.selection) return {};
+    const layer = currentLayer(s.project, s.currentLayerId);
+    if (layer.locked) return {};
+    const hist = pushHistory(s);
+    const { width: w, height: h } = s.project;
+    const sel = s.selection;
+    const x0 = Math.max(0, Math.min(sel.x0, sel.x1));
+    const y0 = Math.max(0, Math.min(sel.y0, sel.y1));
+    const x1 = Math.min(w - 1, Math.max(sel.x0, sel.x1));
+    const y1 = Math.min(h - 1, Math.max(sel.y0, sel.y1));
+    const frame = s.project.frames[s.currentFrameId ?? ''];
+    if (!frame) return {};
+    const cells = [...(frame.cels[layer.id] ?? emptyCells(w, h))];
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) cells[y * w + x] = '';
+    }
+    return {
+      ...hist,
+      project: {
+        ...s.project,
+        frames: { ...s.project.frames, [frame.id]: { ...frame, cels: { ...frame.cels, [layer.id]: cells } } },
+        updatedAt: Date.now(),
+      },
+    };
+  }),
+
   beginStroke: () => set((s) => pushHistory(s)),
 
   paint: (indices, color) => set((s) => {
@@ -503,7 +595,9 @@ export const useStudio = create<StudioState>((set, get) => ({
 
   renameAnimation: (id, name) => set((s) => {
     if (!s.project || !name.trim()) return {};
+    const hist = pushHistory(s);
     return {
+      ...hist,
       project: {
         ...s.project,
         animations: s.project.animations.map((a) => (a.id === id ? { ...a, name: name.trim().slice(0, 24) } : a)),
@@ -579,7 +673,9 @@ export const useStudio = create<StudioState>((set, get) => ({
 
   setAnimFps: (id, fps) => set((s) => {
     if (!s.project) return {};
+    const hist = pushHistoryLive(s);
     return {
+      ...hist,
       project: {
         ...s.project,
         animations: s.project.animations.map((a) => (a.id === id ? { ...a, fps: Math.max(1, Math.min(60, fps)) } : a)),
@@ -599,9 +695,9 @@ export const useStudio = create<StudioState>((set, get) => ({
       hue: 0, sat: 0, light: 0,
     };
     set({
+      ...pushHistory(s),
       project: { ...s.project, variations: [...s.project.variations, v], updatedAt: Date.now() },
       variationId: v.id,
-      dirty: true,
     });
     return v.id;
   },
@@ -609,7 +705,9 @@ export const useStudio = create<StudioState>((set, get) => ({
   updateVariation: (id, patch) => set((s) => {
     if (!s.project) return {};
     if (patch.name !== undefined && !patch.name.trim()) return {};
+    const hist = pushHistoryLive(s);
     return {
+      ...hist,
       project: {
         ...s.project,
         variations: s.project.variations.map((v) => (v.id === id ? { ...v, ...patch } : v)),
@@ -621,7 +719,9 @@ export const useStudio = create<StudioState>((set, get) => ({
 
   deleteVariation: (id) => set((s) => {
     if (!s.project) return {};
+    const hist = pushHistory(s);
     return {
+      ...hist,
       project: { ...s.project, variations: s.project.variations.filter((v) => v.id !== id), updatedAt: Date.now() },
       variationId: s.variationId === id ? ORIGINAL_VARIATION_ID : s.variationId,
       dirty: true,
@@ -644,35 +744,39 @@ export const useStudio = create<StudioState>((set, get) => ({
       .map((p) => ({ id: uid('vr'), name: p.name, mapping: {}, hue: p.hue, sat: p.sat, light: p.light }));
     if (!fresh.length) return;
     set({
+      ...pushHistory(s),
       project: { ...s.project, variations: [...s.project.variations, ...fresh], updatedAt: Date.now() },
       variationId: fresh[0].id,
-      dirty: true,
     });
   },
 
   setPaletteSlot: (i, color) => set((s) => {
     if (!s.project) return {};
+    const hist = pushHistoryLive(s);
     const palette = [...s.project.palette];
     palette[i] = normalizeHex(color);
-    return { project: { ...s.project, palette, updatedAt: Date.now() }, dirty: true };
+    return { ...hist, project: { ...s.project, palette, updatedAt: Date.now() } };
   }),
 
   addPaletteColor: (color) => set((s) => {
     if (!s.project) return {};
     const c = normalizeHex(color);
     if (s.project.palette.includes(c)) return {};
-    return { project: { ...s.project, palette: [...s.project.palette, c], updatedAt: Date.now() }, dirty: true };
+    const hist = pushHistory(s);
+    return { ...hist, project: { ...s.project, palette: [...s.project.palette, c], updatedAt: Date.now() } };
   }),
 
   removePaletteColor: (i) => set((s) => {
     if (!s.project) return {};
+    const hist = pushHistory(s);
     const palette = s.project.palette.filter((_, k) => k !== i);
-    return { project: { ...s.project, palette, updatedAt: Date.now() }, dirty: true };
+    return { ...hist, project: { ...s.project, palette, updatedAt: Date.now() } };
   }),
 
   loadPalette: (colors) => set((s) => {
     if (!s.project) return {};
-    return { project: { ...s.project, palette: colors.map(normalizeHex), updatedAt: Date.now() }, dirty: true };
+    const hist = pushHistory(s);
+    return { ...hist, project: { ...s.project, palette: colors.map(normalizeHex), updatedAt: Date.now() } };
   }),
 
   undo: () => set((s) => {
@@ -683,6 +787,8 @@ export const useStudio = create<StudioState>((set, get) => ({
     const frames = restoreFrames(prev);
     const animations = restoreAnims(prev);
     const layers = restoreLayers(prev);
+    const palette = restorePalette(prev);
+    const variations = restoreVariations(prev);
     // revalida seleção
     let { currentAnimationId, currentFrameId } = s;
     if (!animations.some((a) => a.id === currentAnimationId)) {
@@ -700,7 +806,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     }
     return {
       past, future,
-      project: { ...s.project, frames, animations, layers, updatedAt: Date.now() },
+      project: { ...s.project, frames, animations, layers, palette, variations, updatedAt: Date.now() },
       currentAnimationId, currentFrameId, currentLayerId, dirty: true,
     };
   }),
@@ -712,6 +818,8 @@ export const useStudio = create<StudioState>((set, get) => ({
     const frames = restoreFrames(next);
     const animations = restoreAnims(next);
     const layers = restoreLayers(next);
+    const palette = restorePalette(next);
+    const variations = restoreVariations(next);
     let { currentAnimationId, currentFrameId } = s;
     if (!animations.some((a) => a.id === currentAnimationId)) {
       currentAnimationId = animations[0]?.id ?? null;
@@ -728,7 +836,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     }
     return {
       past, future,
-      project: { ...s.project, frames, animations, layers, updatedAt: Date.now() },
+      project: { ...s.project, frames, animations, layers, palette, variations, updatedAt: Date.now() },
       currentAnimationId, currentFrameId, currentLayerId, dirty: true,
     };
   }),

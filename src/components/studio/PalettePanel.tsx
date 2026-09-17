@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { Pipette, Plus, Trash2, Wand2 } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Download, Pipette, Plus, Trash2, Upload, Wand2 } from 'lucide-react';
 import { useStudio } from '../../store/studio';
 import { STARTER_PALETTES } from '../../lib/templates';
+import { parseGpl, serializeGpl } from '../../lib/palette';
 import { countColors } from '../../lib/pixels';
 import { flattenCells } from '../../lib/layers';
 import { normalizeHex } from '../../lib/color';
@@ -16,8 +17,32 @@ export default function PalettePanel() {
   const loadPalette = useStudio((s) => s.loadPalette);
   const currentFrameId = useStudio((s) => s.currentFrameId);
   const [editing, setEditing] = useState<number | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   if (!project) return null;
+
+  const importGpl = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const pal = parseGpl(String(reader.result ?? ''));
+        if (pal.colors.length) loadPalette(pal.colors);
+      } catch {
+        /* .gpl inválido: ignora sem quebrar a sessão */
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const exportGpl = () => {
+    const blob = new Blob([serializeGpl(project.name || 'paleta', project.palette)], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${project.name || 'paleta'}.gpl`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const extractFromFrame = () => {
     const f = currentFrameId ? project.frames[currentFrameId] : undefined;
@@ -114,6 +139,31 @@ export default function PalettePanel() {
         <p className="mt-2 flex items-center gap-1 text-[11px] text-slate-500">
           <Pipette size={11} /> Segure <kbd className="rounded bg-ink-800 px-1 font-mono">Alt</kbd> + clique no canvas para capturar uma cor.
         </p>
+        <div className="mt-2 flex gap-2">
+          <button
+            onClick={() => fileRef.current?.click()}
+            className="flex flex-1 items-center justify-center gap-1 rounded-md border border-ink-700 px-2 py-1.5 text-[11px] text-slate-400 hover:bg-ink-800 hover:text-slate-200"
+          >
+            <Upload size={12} /> Importar .gpl
+          </button>
+          <button
+            onClick={exportGpl}
+            className="flex flex-1 items-center justify-center gap-1 rounded-md border border-ink-700 px-2 py-1.5 text-[11px] text-slate-400 hover:bg-ink-800 hover:text-slate-200"
+          >
+            <Download size={12} /> Exportar .gpl
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".gpl"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) importGpl(f);
+              e.target.value = '';
+            }}
+          />
+        </div>
       </div>
 
       {/* presets */}

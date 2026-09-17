@@ -64,7 +64,12 @@ export interface ProjectData {
   updatedAt: number;
 }
 
-export type ToolId = 'brush' | 'eraser' | 'fill' | 'picker' | 'line' | 'rect' | 'ellipse';
+export type ToolId = 'brush' | 'eraser' | 'fill' | 'picker' | 'line' | 'rect' | 'ellipse' | 'select';
+
+/** Seleção retangular (coordenadas inclusivas, normalizadas: x0<=x1, y0<=y1). */
+export interface SelRect {
+  x0: number; y0: number; x1: number; y1: number;
+}
 
 export type EnginePreset = 'generic' | 'phaser' | 'godot' | 'unity' | 'gamemaker';
 

@@ -116,7 +116,7 @@ obrigatório em `docs/BENCHMARK.md` (referência × atual × alvo por sistema).
   dedupe de paint, fill sem undo vazio, atalho Y, preview de forma fiel, `tests/pixel/` (vitest, 24 testes)
 - [x] **FASE B1 — Layers**: modelo frame × layer = cel + `LayersPanel` + migração
   idempotente + composite com alpha no render/export + layers no undo (36 testes verdes)
-- [ ] **FASE B2 — Seleção + paleta**: seleção retangular + mover, undo em paleta,
+- [x] **FASE B2 — Seleção + paleta**: seleção retangular + mover, undo em paleta,
   importar/exportar `.gpl`
 - [ ] **FASE C — Animation**: copiar/colar frames, drag-reorder, duração por frame,
   onion prev/next configurável, ping-pong/reverso, preview 1x
