@@ -248,7 +248,7 @@ const NAMES: Record<ItemType, string[]> = {
   cogumelo: ['Chapéu', 'Fungo', 'Boleto', 'Cogumelo', 'Esporo'],
   tocha: ['Tocha', 'Chama', 'Farol', 'Braseiro', 'Lume'],
 };
-const TITLES = ['Ancestral', 'Brilhante', 'Esquecido', 'Raro', 'Encantado'];
+const TITLES = ['Ancestral', 'Real', 'do Abismo', 'da Lenda', 'do Dragão'];
 
 /* ---------------------------------- api ----------------------------------- */
 

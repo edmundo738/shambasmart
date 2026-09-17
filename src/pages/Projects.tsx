@@ -136,6 +136,9 @@ export default function Projects() {
           <Link to="/gerador" className="flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-forge-500 to-pixel-500 px-3 py-2 text-xs font-bold text-ink-950 hover:brightness-110">
             <Sparkles size={14} /> Gerador de Sprites
           </Link>
+          <Link to="/biblioteca" className="flex items-center gap-1.5 rounded-lg border border-forge-500/50 bg-forge-500/10 px-3 py-2 text-xs font-bold text-forge-300 hover:bg-forge-500/20">
+            <Layers size={14} /> Biblioteca
+          </Link>
           <Link to="/lab" className="flex items-center gap-1.5 rounded-lg border border-ink-600 px-3 py-2 text-xs font-semibold text-slate-300 hover:border-pixel-500">
             <FlaskConical size={14} /> Lab
           </Link>

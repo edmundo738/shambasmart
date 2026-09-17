@@ -47,6 +47,7 @@ export interface ProjectData {
   variations: Variation[];
   palette: string[];
   recipe?: AssetRecipe;
+  bundle?: string;
   createdAt: number;
   updatedAt: number;
 }

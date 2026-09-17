@@ -275,7 +275,7 @@ const NAMES: Record<WeaponType, string[]> = {
   arco: ['Vento', 'Longínquo', 'Céu', 'Caçada', 'Estrela'],
   lanca: ['Aguilhão', 'Muralha', 'Ponta', 'Vanguarda', 'Cometa'],
 };
-const TITLES = ['Antiga', 'Rúnica', 'Sombria', 'Dourada', 'Veloz', 'Arcana'];
+const TITLES = ['do Norte', 'de Guerra', 'das Sombras', 'do Amanhecer', 'da Tempestade', 'do Crepúsculo'];
 
 /* ---------------------------------- api ----------------------------------- */
 

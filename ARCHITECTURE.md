@@ -101,6 +101,8 @@ Regras de engenharia:
 - [x] **F4 (parcial) — Parts + recipe**: rig parts, `AssetRecipe`, `RecipeCard`
 - [x] **F5 (parcial) — Rig**: hierarquia + poses + blink/alts (IK completo pendente)
 - [x] **F6 (parcial) — Motion**: 6 ações × 3 grupos + 7 presets de auto-movimento
+- [x] **F9 (parcial) — Variantes**: 6 temas determinísticos sobre `AssetRecipe` + modal compara/salva (forma/roupa/raridade pendentes)
+- [x] **F11 (parcial) — Batch**: 3 packs temáticos coerentes + ZIP combinado + grade da Biblioteca (fila/galeria de candidatos pendentes)
 - [ ] **F7 — Multi-ângulo**: 4/8 direções do mesmo Master (próx. núcleo grande)
 - [ ] **F8 — 2.5D**: profundidade, câmera orbital, projeção ortográfica
 - [ ] **F9 — Variantes profundas**: forma/proporção/roupa/raridade + LOCK/REROLL

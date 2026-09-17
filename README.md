@@ -16,6 +16,7 @@
 - **Laboratório Procedural** — algoritmo com seed que gera personagens (5 corpos, paletas, olhos, armas, acessórios) e anima 6 ações via rig de poses: idle, andar, correr, pular, ataque e dança
 - **Auto-movimento** — movimento procedural para qualquer sprite desenhado à mão: a partir de um frame, gere respirar, flutuar, pular, investida, dano (flash + tremor) e dissolve de spawn/despawn
 - **Gerador de Sprites** (`/gerador`) — para quem não sabe desenhar: 5 categorias (personagem, criatura, arma, item, efeito), 6 estilos visuais, seed reproduzível, prévia animada e receita (`AssetRecipe`) que regenera o mesmo asset sempre; cria no Studio ou baixa o pack ZIP direto
+- **Biblioteca** (`/biblioteca`) — packs completos de jogo em 1 clique (Herói da Aldeia, Masmorra Sombria, Caça ao Tesouro), grade animada com busca/filtros e variações 1-clique (Ouro, Brasa, Veneno, Gelo, Noturna, Irmão) com salvar individual ou em lote
 - **SaaS completo** — landing page, contas, planos (Grátis/Pro/Studio) e dashboard de projetos com autosave
 
 ## 🚀 Como rodar

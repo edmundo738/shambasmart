@@ -155,7 +155,7 @@ const NAMES: Record<FxType, string[]> = {
   fumaca: ['Névoa', 'Véu', 'Sopro', 'Bruma', 'Cinzas'],
   anel: ['Pulso', 'Onda', 'Eco', 'ressonância'.trim(), 'Círculo'],
 };
-const TITLES = ['Arcano', 'Ancestral', 'Violento', 'Místico', 'Final'];
+const TITLES = ['Ancestral', 'Final', 'do Caos', 'Selvagem', 'do Vazio'];
 
 /* ---------------------------------- api ----------------------------------- */
 
