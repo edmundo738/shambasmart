@@ -1,2 +1,41 @@
-# shambasmart
-um app mobile + web AgroTech, chamado CHAMBA / ShambaSmart, que conecta camponeses, compradores, transportadores, estudantes e investidores, gerando renda, impacto social, sustentabilidade e engajamento real.
+# PixelForge Studio 🎮
+
+**SaaS online para criar animações, variações e asset packs 2D/pixel art** — feito para desenvolvedores de jogos 2D e ilustradores pixel.
+
+> Um modelo. Infinitas animações. Exporte packs sequenciados prontos para Godot, Unity, Phaser e GameMaker.
+
+## ✨ O que o app faz
+
+- **Editor pixel profissional** — pincel, borracha, balde, conta-gotas, linha, retângulo, elipse, espelhamento X/Y, grade e onion skin
+- **Ações bem sequenciadas** — cada animação (`idle`, `andar`, `ataque`…) com seus frames, FPS e ordem garantidos
+- **Forja de variações** — gere skins do mesmo modelo (sombra, gelo, ouro, veneno…) de forma não-destrutiva, aplicadas a todas as ações de uma vez
+- **Troca de cores fina** — remapeie qualquer cor da paleta por variação, com prévia animada em tempo real
+- **Prévia do jogo** — veja a animação na velocidade real, com fundo transparente/chroma e tira de frames
+- **Export de packs** — ZIP organizado com spritesheets PNG, metadados JSON por engine, GIFs e frames avulsos (`andar__gelo_f00.png`)
+- **Modelos prontos** — slime, cavaleiro, moeda e fantasma, todos animados e editáveis
+- **SaaS completo** — landing page, contas, planos (Grátis/Pro/Studio) e dashboard de projetos com autosave
+
+## 🚀 Como rodar
+
+```bash
+npm install
+npm run dev     # http://localhost:5173
+npm run build   # build de produção (tsc + vite)
+```
+
+## 🗺️ Rotas
+
+| Rota | Página |
+|------|--------|
+| `/` | Landing page do SaaS |
+| `/projetos` | Dashboard: criar, templates, projetos salvos, planos |
+| `/studio` | Editor (cria via `?template=slime` ou `?name=...&w=32&h=32`) |
+| `/studio/:projectId` | Editor de um projeto salvo |
+
+## 🧱 Stack
+
+React 18 + TypeScript + Vite + Tailwind + Zustand + React Router + `gifenc` (GIF) + `jszip` (packs). Persistência local (localStorage) no MVP, com arquitetura pronta para backend.
+
+## ⌨️ Atalhos do Studio
+
+`B E G I L R O` ferramentas · `Espaço` play/pause · `←→` navegar frames · `Ctrl+Z/Y` desfazer/refazer · `Ctrl+S` salvar · `Alt+clique` capturar cor · `X` espelhar · `[ ]` tamanho do pincel
