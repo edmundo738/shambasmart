@@ -9,6 +9,7 @@ import { clampAnchor, cloneFrameMeta, normalizeHitbox, opaqueBBox } from '../lib
 import { clonePose, normalizeDeg, solveFK, worldToLocal, wouldCycle } from '../lib/fk';
 import { createLayer, flattenCells, makeFrame, migrateProject } from '../lib/layers';
 import { normalizeHex } from '../lib/color';
+import { clampZoom } from '../lib/viewport';
 import { TEMPLATES } from '../lib/templates';
 
 interface HistorySnap {
@@ -97,6 +98,11 @@ interface StudioState {
   setOnionTintPrev: (c: string) => void;
   setOnionTintNext: (c: string) => void;
   setZoom: (z: number) => void;
+  viewportRequest: { kind: 'fit' | 'z100' | 'z200'; n: number } | null;
+  requestViewport: (kind: 'fit' | 'z100' | 'z200') => void;
+  clearViewport: () => void;
+  panHeld: boolean;
+  setPanHeld: (b: boolean) => void;
   setPlaying: (b: boolean) => void;
   select: (animId: string | null, frameId?: string | null) => void;
   setVariation: (id: string) => void;
@@ -321,6 +327,8 @@ export const useStudio = create<StudioState>((set, get) => ({
   selectedBoneId: null,
   showRig: true,
   zoom: 12,
+  viewportRequest: null,
+  panHeld: false,
   playing: true,
   currentAnimationId: null,
   currentFrameId: null,
@@ -407,7 +415,10 @@ export const useStudio = create<StudioState>((set, get) => ({
   setOnionOpacity: (n) => set({ onionOpacity: Math.max(5, Math.min(80, Math.round(n))) }),
   setOnionTintPrev: (c) => set({ onionTintPrev: c }),
   setOnionTintNext: (c) => set({ onionTintNext: c }),
-  setZoom: (zoom) => set({ zoom: Math.max(4, Math.min(32, zoom)) }),
+  setZoom: (zoom) => set({ zoom: clampZoom(zoom) }),
+  requestViewport: (kind) => set((s) => ({ viewportRequest: { kind, n: (s.viewportRequest?.n ?? 0) + 1 } })),
+  clearViewport: () => set({ viewportRequest: null }),
+  setPanHeld: (panHeld) => set({ panHeld }),
   setPlaying: (playing) => set({ playing }),
 
   select: (animId, frameId) => set((s) => {

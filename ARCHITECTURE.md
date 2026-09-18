@@ -125,9 +125,11 @@ obrigatório em `docs/BENCHMARK.md` (referência × atual × alvo por sistema).
 - [x] **FASE D1 — Âncoras/hitbox**: pontos + colisão por frame, ferramenta T, overlay,
   MetaPanel, auto-fit, export JSON por frame (94 testes)
 - [x] **FASE D2 — Bones/FK**: esqueleto-guia editável (local/pai/mundo), render pixel-snapped
-- [ ] **FASE E — IK**: two-bone + FABRIK estável com limites, foot/hand targets
-- [ ] **FASE F — Motion**: 6 movimentos (idle/walk/run/jump/attack/hurt) com princípios
-  de animação + curvas + retargeting entre proporções + edição pós-geração
+- [ ] **FASE E — Editor Core**: E1 navegação do canvas (zoom-ancorado, pan, fit, HUD)
+  → E2 brush → E3 seleção/transform → E4 cor → E5 layers → E6 guias → E7 histórico
+- [ ] **FASE F — Rig+Motion**: IK two-bone + FABRIK com limites, 6 movimentos
+  (idle/walk/run/jump/attack/hurt) com curvas + retargeting + edição pós-geração,
+  tags por ação, modo silhueta no onion
 - [ ] **FASE G — Import/Export**: PNG, spritesheet (linhas×colunas), frames avulsos, APNG
 - [ ] **FASE H — Persistence**: paleta/variações no histórico, diff por cel se 256px+
   reprovar, snapshots + recuperação

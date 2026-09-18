@@ -49,6 +49,7 @@ export default function PixelCanvas() {
   const showMeta = useStudio((s) => s.showMeta);
   const showRig = useStudio((s) => s.showRig);
   const selectedBoneId = useStudio((s) => s.selectedBoneId);
+  const panHeld = useStudio((s) => s.panHeld);
 
   const anim = project?.animations.find((a) => a.id === currentAnimationId) ?? project?.animations[0];
   const frame = currentFrameId ? project?.frames[currentFrameId] : undefined;
@@ -407,6 +408,7 @@ export default function PixelCanvas() {
 
   /* ------------------------------ interações ------------------------------ */
   const onPointerDown = (e: React.PointerEvent) => {
+    if (e.button === 1 || useStudio.getState().panHeld) return; // pan: tratado pelo CanvasStage
     const cell = cellFromEvent(e);
     if (!cell || !project || !frame) return;
     (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
@@ -685,7 +687,7 @@ export default function PixelCanvas() {
     <div className="relative inline-block">
       <canvas
         ref={canvasRef}
-        className="pixelated checker cursor-crosshair rounded-lg border border-ink-600 shadow-2xl"
+        className={`pixelated checker rounded-lg border border-ink-600 shadow-2xl ${panHeld ? "cursor-grab" : "cursor-crosshair"}`}
         style={{ width: project.width * zoom, height: project.height * zoom }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}

@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Clapperboard, Download, Palette as PaletteIcon, Shapes, ZoomIn, ZoomOut } from 'lucide-react';
+import { Clapperboard, Download, Palette as PaletteIcon, Shapes } from 'lucide-react';
 import { useStudio } from '../store/studio';
 import { useProjects } from '../store/projects';
 import TopBar from '../components/studio/TopBar';
 import Toolbar from '../components/studio/Toolbar';
-import PixelCanvas from '../components/studio/PixelCanvas';
+import CanvasStage from '../components/studio/CanvasStage';
 import Timeline from '../components/studio/Timeline';
 import AnimationsPanel from '../components/studio/AnimationsPanel';
 import VariationsPanel from '../components/studio/VariationsPanel';
@@ -31,8 +31,6 @@ export default function Studio() {
 
   const project = useStudio((s) => s.project);
   const dirty = useStudio((s) => s.dirty);
-  const zoom = useStudio((s) => s.zoom);
-  const setZoom = useStudio((s) => s.setZoom);
   const markSaved = useStudio((s) => s.markSaved);
   const saveProject = useProjects((s) => s.saveProject);
   const loadProjectFull = useProjects((s) => s.loadProjectFull);
@@ -135,6 +133,10 @@ export default function Studio() {
         case 'm': st.setTool('select'); break;
         case 't': st.setTool('meta'); break;
         case 'n': st.setTool('bone'); break;
+        case 'f': st.requestViewport('fit'); break;
+        case '1': st.requestViewport('z100'); break;
+        case '2': st.requestViewport('z200'); break;
+        case 'h': if (!e.repeat) st.setPanHeld(true); break;
         case 'p': st.togglePixelPerfect(); break;
         case 'x': st.toggleMirrorX(); break;
         case 'y': st.toggleMirrorY(); break;
@@ -179,7 +181,15 @@ export default function Studio() {
       }
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    const off = (e: KeyboardEvent) => { if (e.key.toLowerCase() === 'h') useStudio.getState().setPanHeld(false); };
+    const blur = () => useStudio.getState().setPanHeld(false);
+    window.addEventListener('keyup', off);
+    window.addEventListener('blur', blur);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keyup', off);
+      window.removeEventListener('blur', blur);
+    };
   }, [saveProject, markSaved]);
 
   if (!ready || !project) {
@@ -236,25 +246,7 @@ export default function Studio() {
 
         {/* centro: canvas + timeline */}
         <main className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
-          <div className="cabinet thin-scroll relative flex min-h-[320px] flex-1 items-center justify-center overflow-auto rounded-xl border border-ink-700 bg-ink-900/30 bg-[radial-gradient(circle_at_50%_40%,rgba(34,184,240,0.07),transparent_60%)] p-6">
-            <PixelCanvas />
-            <div className="pixel-corners-sm absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1 border-2 border-ink-600 bg-ink-950/90 px-2 py-1 shadow-xl">
-              <button onClick={() => setZoom(zoom - 2)} className="rounded-full p-1.5 text-slate-400 hover:bg-ink-800 hover:text-white" title="Reduzir zoom">
-                <ZoomOut size={14} />
-              </button>
-              <span className="w-12 text-center font-mono text-[11px] text-slate-300">{zoom * project.width}px</span>
-              <button onClick={() => setZoom(zoom + 2)} className="rounded-full p-1.5 text-slate-400 hover:bg-ink-800 hover:text-white" title="Aumentar zoom">
-                <ZoomIn size={14} />
-              </button>
-            </div>
-            <div className="pf-shadow-sm absolute right-3 top-3 hidden rounded-lg border border-ink-700 bg-ink-950/80 px-2.5 py-1.5 font-mono text-[10px] leading-relaxed text-slate-500 xl:block">
-              <div className="pf-eyebrow mb-1 text-[9px] text-forge-400">▸ atalhos</div>
-              <div><kbd className="text-slate-300">B E G I M T N L R O</kbd> ferramentas</div>
-              <div><kbd className="text-slate-300">Espaço</kbd> play · <kbd className="text-slate-300">←→</kbd> frames</div>
-              <div><kbd className="text-slate-300">Ctrl+C/X/V</kbd> copiar/colar frame</div>
-              <div><kbd className="text-slate-300">Ctrl+Z</kbd> desfazer · <kbd className="text-slate-300">Alt+clique</kbd> cor</div>
-            </div>
-          </div>
+                    <CanvasStage />
           <Timeline />
         </main>
 

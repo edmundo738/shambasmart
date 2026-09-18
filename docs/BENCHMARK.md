@@ -11,6 +11,16 @@ Legenda de status: ✅ sólido · 🟡 funcional mas amador · 🔴 ausente/frá
 
 ---
 
+## CANVAS 🟢 (E1 entregue)
+
+- **REFERENCE (Aseprite/Pixelorama):** Ctrl+wheel com zoom-no-cursor, pan (mão/meio),
+  fit, 100%/200%, HUD mínima; zoom inteiro = pixel-crisp.
+- **CURRENT (E1 entregue):** escada 1–64 + Ctrl+wheel ancorado no cursor + pan
+  (H segurado/botão-do-meio/arrastar fundo) + F fit + 1/2 + pill com % + HUD
+  (tamanho/zoom/frame/layer/tool/PP) + auto-fit ao abrir projeto.
+- **TARGET:** rotação de canvas e workspace infinito ficam DE FORA (irrelevantes
+  p/ pixel art; nenhum pixel editor tem).
+
 ## DRAWING (desenho livre) 🟢 (A entregue; restos → E2)
 
 - **REFERENCE (Aseprite/Pixelorama):** interpolação entre eventos de ponteiro (nunca
