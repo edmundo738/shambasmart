@@ -124,7 +124,7 @@ obrigatório em `docs/BENCHMARK.md` (referência × atual × alvo por sistema).
   preview 1x, GIF/metas ouvem o modo (81 testes)
 - [x] **FASE D1 — Âncoras/hitbox**: pontos + colisão por frame, ferramenta T, overlay,
   MetaPanel, auto-fit, export JSON por frame (94 testes)
-- [ ] **FASE D2 — Bones/FK**: esqueleto-guia editável (local/pai/mundo), render pixel-snapped
+- [x] **FASE D2 — Bones/FK**: esqueleto-guia editável (local/pai/mundo), render pixel-snapped
 - [ ] **FASE E — IK**: two-bone + FABRIK estável com limites, foot/hand targets
 - [ ] **FASE F — Motion**: 6 movimentos (idle/walk/run/jump/attack/hurt) com princípios
   de animação + curvas + retargeting entre proporções + edição pós-geração

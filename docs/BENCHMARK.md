@@ -11,18 +11,15 @@ Legenda de status: ✅ sólido · 🟡 funcional mas amador · 🔴 ausente/frá
 
 ---
 
-## DRAWING (desenho livre) 🟡 → FASE A
+## DRAWING (desenho livre) 🟢 (A entregue; restos → E2)
 
 - **REFERENCE (Aseprite/Pixelorama):** interpolação entre eventos de ponteiro (nunca
   deixa falhas em traços rápidos); modo pixel-perfect (remove cantos duplos em
   diagonais 1px); coordenadas inteiras; pincel redondo/quadrado com preview do cursor.
-- **CURRENT:** `PixelCanvas` pinta só a célula do evento atual — **traço rápido vira
-  tracejado com falhas** (o defeito mais visível do editor). Sem pixel-perfect. Pincel
-  quadrado 1–4px, sem preview de cursor. Cada `pointermove` clona o array inteiro de
-  células e dispara `set()` mesmo repetindo a mesma célula (lixo de render em telas grandes).
-- **TARGET:** interpolar segmento entre última e atual célula em todo drag de
-  pincel/borracha; pixel-perfect estilo Aseprite para pincel 1px (default ON, toggle `P`);
-  pular `paint` quando os índices não mudaram; preview do pincel no hover.
+- **CURRENT (A entregue):** interpolação de traço entre células (sem falhas);
+  pixel-perfect 1px default ON (toggle `P`); pincel quadrado 1–4px; espelhos X/Y.
+  Falta: preview do pincel no hover; pincel redondo/custom; estabilização.
+- **TARGET:** preview no hover + pincel redondo/custom + estabilização (→ FASE E2).
 
 ## PIXEL TOOLS 🟡 → FASE A
 
@@ -30,71 +27,65 @@ Legenda de status: ✅ sólido · 🟡 funcional mas amador · 🔴 ausente/frá
   retângulo, elipse, seleção, laço, mover, recorte, degradê, simetria — cada uma com
   atalho, preview e undo corretos.
 - **CURRENT:** pincel, borracha, balde (contíguo, sem tolerância — correto p/ pixel art),
-  conta-gotas (+Alt), linha/ret/elipse com preview em overlay e Shift=preencher,
-  espelho X/Y, grade. Atalhos B/E/G/I/L/R/O/X/`[`/`]`. **Bugs reais:** (1) atalho `Y`
-  anunciado no botão de espelho vertical não existe no handler; (2) `fill` empilha
-  undo mesmo quando nada mudou; (3) preview das formas não mostra o espelho nem o
-  preenchimento (Shift) — o resultado final difere do preview; (4) `fillAt` é um stub
-  morto na store.
-- **TARGET:** corrigir os 4 bugs; tolerância do balde fica de fora (pixel art usa
-  contíguo exato); simetria além do espelho vai para FASE B+.
+  conta-gotas (+Alt), linha/ret/elipse com preview em overlay e Shift, espelho X/Y,
+  grade. Atalhos B/E/G/I/L/R/O/M/T/N/P/X/Y/`[`/`]`. Bugs (1) `Y` e (4) `fillAt` morto
+  resolvidos; (2) undo do fill e (3) fidelidade do preview precisam re-verificação.
+- **TARGET:** re-verificar (2)(3); tolerância do balde fica de fora; Shift-quadrado/
+  Alt-centro/arredondado + auditar elipse (→ E2); polígono/laço/varinha (→ E3).
 
-## LAYERS 🔴 → FASE B
+## LAYERS 🟡 (B1 entregue; avançado → E5)
 
 - **REFERENCE (Aseprite):** unidade de trabalho = frame × layer = cel; visibilidade,
   lock, opacidade, nome, ordem, grupos, layers de referência; blend/clipping.
-- **CURRENT:** não existe. `Frame.cells` é uma camada única chapada. O botão com ícone
-  de Layers na toolbar é o toggle de onion skin (nome enganoso, corrigir label).
-- **TARGET:** modelo `frame × layer = cel` com vis/lock/opacity/nome/ordem; composição
-  determinística; undo por cel; migração automática dos projetos antigos (1 layer).
+- **CURRENT (B1 entregue):** modelo `frame × layer = cel` com vis/lock/opacity/nome/
+  ordem + migração automática. Sem grupos/blend/alpha-lock/clipping.
+- **TARGET:** grupos + blend + alpha lock + clipping (→ FASE E5).
 
-## TIMELINE 🟡 → FASE C
+## TIMELINE 🟢 (C1 entregue; tags → F)
 
 - **REFERENCE (Aseprite tags):** frames + cels, duração por frame, duplicar/excluir/
   reordenar (drag), copiar/colar, tags com loops, modos de playback, step.
-- **CURRENT:** strip horizontal com add/duplicar/excluir/mover(±1)/limpar, FPS por ação
-  (slider 1–24), play/pause, setas ←/→ trocam frame. Sem duração individual, sem tags,
-  sem copiar/colar, sem drag-reorder, sem ping-pong/reverso/step na UI.
-- **TARGET:** copiar/colar frames (Ctrl+C/V), drag-reorder, duração por frame (ms),
-  step ⏮/⏭ na UI, ping-pong; tags na FASE C2.
+- **CURRENT (C1 entregue):** strip + duração por frame (ms), copiar/recortar/colar,
+  drag-reorder, step ⏮/⏭. Sem tags.
+- **TARGET:** tags por ação (→ FASE F).
 
-## ANIMATION / PLAYBACK 🟡 → FASE C
+## ANIMATION / PLAYBACK 🟢 (C2 entregue)
 
 - **REFERENCE:** player com play/pause/loop/ping-pong/reverso, FPS real = FPS do jogo,
   preview em tamanho real + ampliado.
-- **CURRENT:** `PreviewPanel` com play/pause, fundos (transparente/escuro/claro/chroma),
-  zoom 4/6/8x, tira de frames com variação aplicada, contador do pack. Loop simples;
-  sem ping-pong/reverso; sem preview 1x fiel (mínimo 4x).
-- **TARGET:** ping-pong + reverso + step; modo 1x "tamanho do jogo"; manter o resto.
+- **CURRENT (C2 entregue):** play/pause, ping-pong/reverso/step por ação, preview 1x
+  "tamanho do jogo", fundos, tira com variação aplicada. Sem desenhar-com-play.
+- **TARGET:** tags (→ F); desenhar-com-play em pesquisa.
 
-## ONION SKIN 🟡 → FASE C
+## ONION SKIN 🟢 (C2 entregue; modos → F)
 
 - **REFERENCE:** N frames antes/depois, opacidade, tinta por direção (vermelho/azul),
   alcance configurável; útil de verdade para in-between manual.
-- **CURRENT:** só 1 frame anterior, tinta vermelha fixa, alpha 0.32 fixo. Funciona,
-  mas é mínimo.
-- **TARGET:** anterior+posterior, contagem (1–3), opacidade, tintas configuráveis.
+- **CURRENT (C2/D2 entregues):** prev/next configuráveis (contagem, opacidade, tintas)
+  + ghosts das poses do rig. Sem modo outline-only/silhueta.
+- **TARGET:** modo silhueta/outline-only (→ F).
 
-## TRANSFORMS 🔴 → FASE B (com seleção)
+## TRANSFORMS 🟡 (B2 parcial; rot/escala → E3)
 
 - **REFERENCE (Aseprite RotSprite):** seleção com pivô, mover/rotacionar/escalar com
   algoritmos pixel-safe (nearest, rotação que preserva clusters); flip H/V da seleção.
-- **CURRENT:** não existe mover/selecionar pixels. Espelho é só assistência de desenho.
-- **TARGET FASE B:** seleção retangular + mover (arrastar, setas, recorte) com
-  composite determinístico; flip H/V da seleção; rot/escala pixel-safe entram na FASE D.
+- **CURRENT (B2 entregue):** seleção retangular + mover (arrastar/setas) + flip H/V
+  com composite determinístico. Sem rot/escala.
+- **TARGET:** rot/escala pixel-safe estilo RotSprite/rotxel (→ FASE E3). Skew/
+  perspectiva livres ficam DE FORA (conflitam com pixel-perfect).
 
-## SELECTION 🔴 → FASE B
+## SELECTION 🟡 (B2 parcial; resto → E3)
 
 - **REFERENCE:** retângulo, elipse, laço, varinha; flutuar seleção; Esc cancela.
-- **CURRENT:** ausente.
-- **TARGET FASE B:** retângulo + mover + Esc; laço/varinha depois, se necessário.
+- **CURRENT (B2 entregue):** retângulo + mover + Esc + Delete.
+- **TARGET:** elipse/laço/varinha + flutuar (→ FASE E3).
 
-## PALETTE 🟡 → FASE B
+## PALETTE 🟡 (B2 entregue; cor avançada → E4)
 
 - **REFERENCE:** paleta indexada, slots, importar/exportar (.gpl/.pal), rampas, lock de cor.
-- **CURRENT:** paleta por projeto (lista hex), slots editáveis, conta-gotas; sem
-  import/export de arquivo; sem undo em operações de paleta.
-- **TARGET:** undo em paleta; importar/exportar `.gpl`; rampas ficam p/ StyleEngine.
+- **CURRENT (B2 entregue):** slots editáveis + undo + importar/exportar `.gpl`;
+  conta-gotas (+Alt). Sem rampas/recentes/favoritos.
+- **TARGET:** rampas + dithering + shading (→ FASE E4); ASE/ACT/JSON depois.
 
 ## RIG / BONES / IK / MESH / SKIN 🟡 → FASE D/E
 
