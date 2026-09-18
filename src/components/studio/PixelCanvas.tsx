@@ -10,13 +10,13 @@ function pointInSel(x: number, y: number, r: SelRect): boolean {
   return x >= n.x0 && x <= n.x1 && y >= n.y0 && y <= n.y1;
 }
 import {
-  brushIndices, ellipsePoints, emptyCells, floodFill, idx, inBounds, linePoints, mirrorPoints,
-  pixelPerfectStep, rectPoints,
+  brushStamp, customStamp, ellipsePoints, emptyCells, floodFill, idx, inBounds, linePoints, mirrorPoints,
+  pixelPerfectStep, pressureSize, rectPoints, roundedRectPoints, shapeEnds, snapLineAngle,
 } from '../../lib/pixels';
 import { compositeStack, flattenCells } from '../../lib/layers';
 import { pickAnchor, pointInHitbox } from '../../lib/frameMeta';
 import { angleTo, distToSegment, normalizeDeg, snapWorldBone, solveFK, worldToLocal, WorldBone } from '../../lib/fk';
-import { cellFromView } from '../../lib/viewport';
+import { cellFromView, posFromView } from '../../lib/viewport';
 
 export default function PixelCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -28,6 +28,7 @@ export default function PixelCanvas() {
     mode: 'paint' | 'shape' | 'marquee' | 'move' | 'anchor' | 'hitbox' | 'metadraw' | 'bonepose' | 'bonerot';
     moved: boolean; base: SelRect | null;
     anchorId: string | null; hbDX: number; hbDY: number; hbResize: boolean; boneId: string | null;
+    pressure?: number; isPen?: boolean; stab?: Array<[number, number]>;
   } | null>(null);
 
   const project = useStudio((s) => s.project);
@@ -142,6 +143,34 @@ export default function PixelCanvas() {
     return [x, y];
   }, [project]);
 
+  const posFromEvent = useCallback((e: React.PointerEvent): [number, number] | null => {
+    const canvas = canvasRef.current;
+    if (!canvas || !project) return null;
+    const rect = canvas.getBoundingClientRect();
+    const x = posFromView(0, e.clientX - rect.left, rect.width, project.width);
+    const y = posFromView(0, e.clientY - rect.top, rect.height, project.height);
+    if (x === null || y === null) return null;
+    return [x, y];
+  }, [project]);
+
+  /** Célula do traço: com estabilizador, média móvel da posição sub-célula. */
+  const strokeCell = useCallback((e: React.PointerEvent): [number, number] | null => {
+    const d = drag.current;
+    const st = useStudio.getState();
+    const p = st.project;
+    if (!p) return null;
+    if (!d || st.stabilizer <= 0) return cellFromEvent(e);
+    const pos = posFromEvent(e);
+    if (!pos) return null;
+    const trail = [...(d.stab ?? []), pos].slice(-st.stabilizer);
+    d.stab = trail;
+    const ax = trail.reduce((a, q) => a + q[0], 0) / trail.length;
+    const ay = trail.reduce((a, q) => a + q[1], 0) / trail.length;
+    const x = Math.floor(ax), y = Math.floor(ay);
+    if (!inBounds(x, y, p.width, p.height)) return null;
+    return [x, y];
+  }, [cellFromEvent, posFromEvent]);
+
   /** Traço com interpolação (sem falhas), pixel-perfect e dedupe de eventos. */
   const applyStrokeTo = useCallback((x: number, y: number, erase: boolean) => {
     const d = drag.current;
@@ -153,7 +182,7 @@ export default function PixelCanvas() {
     d.lastX = x;
     d.lastY = y;
     const color = erase ? '' : st.color;
-    const usePP = st.pixelPerfect && st.brushSize === 1 && !st.mirrorX && !st.mirrorY && d.orig !== null;
+    const usePP = st.pixelPerfect && st.brushSize === 1 && st.brushShape !== 'custom' && !st.mirrorX && !st.mirrorY && d.orig !== null;
 
     if (usePP) {
       let trail = d.trail;
@@ -179,10 +208,15 @@ export default function PixelCanvas() {
       return;
     }
 
+    const effSize = pressureSize(st.brushSize, d.pressure ?? 0, (d.isPen ?? false) && st.pressureSize);
+    const custom = st.brushShape === 'custom' ? st.customBrush : null;
     const indices = new Set<number>();
     for (const [sx, sy] of seg) {
       for (const [mx, my] of mirrorPoints(sx, sy, p.width, p.height, st.mirrorX, st.mirrorY)) {
-        for (const i of brushIndices(mx, my, st.brushSize, p.width, p.height)) indices.add(i);
+        const stamped = custom
+          ? customStamp(mx, my, custom.mask, custom.w, custom.h, p.width, p.height)
+          : brushStamp(mx, my, effSize, st.brushShape === 'circle' ? 'circle' : 'square', p.width, p.height);
+        for (const i of stamped) indices.add(i);
       }
     }
     if (!indices.size) return;
@@ -192,7 +226,7 @@ export default function PixelCanvas() {
     st.paint([...indices], erase ? null : st.color);
   }, []);
 
-  const drawOverlayShape = useCallback((x1: number, y1: number, filled: boolean) => {
+  const drawOverlayShape = useCallback((x1: number, y1: number, shiftKey: boolean, altKey: boolean) => {
     const d = drag.current;
     const overlay = overlayRef.current;
     const st = useStudio.getState();
@@ -203,12 +237,17 @@ export default function PixelCanvas() {
     const ctx = overlay.getContext('2d')!;
     ctx.imageSmoothingEnabled = false;
     let pts: Array<[number, number]> = [];
-    if (st.tool === 'line') pts = linePoints(d.startX, d.startY, x1, y1);
-    else if (st.tool === 'rect') pts = rectPoints(d.startX, d.startY, x1, y1, filled);
-    else if (st.tool === 'ellipse') {
-      const cx = (d.startX + x1) / 2;
-      const cy = (d.startY + y1) / 2;
-      pts = ellipsePoints(cx, cy, Math.abs(x1 - d.startX) / 2, Math.abs(y1 - d.startY) / 2, filled);
+    if (st.tool === 'line') {
+      const [ex, ey] = shiftKey ? snapLineAngle(d.startX, d.startY, x1, y1) : [x1, y1];
+      pts = linePoints(d.startX, d.startY, ex, ey);
+    } else if (st.tool === 'rect') {
+      const [ax0, ay0, ax1, ay1] = shapeEnds(d.startX, d.startY, x1, y1, shiftKey, altKey);
+      pts = st.cornerRadius > 0
+        ? roundedRectPoints(ax0, ay0, ax1, ay1, st.cornerRadius, st.rectFilled)
+        : rectPoints(ax0, ay0, ax1, ay1, st.rectFilled);
+    } else if (st.tool === 'ellipse') {
+      const [ex0, ey0, ex1, ey1] = shapeEnds(d.startX, d.startY, x1, y1, shiftKey, altKey);
+      pts = ellipsePoints((ex0 + ex1) / 2, (ey0 + ey1) / 2, Math.abs(ex1 - ex0) / 2, Math.abs(ey1 - ey0) / 2, st.ellipseFilled);
     }
     ctx.fillStyle = st.color;
     ctx.globalAlpha = 0.75;
@@ -384,6 +423,46 @@ export default function PixelCanvas() {
     drawRig();
   }, [drawAnts, drawMeta, drawRig]);
 
+  /** Fantasma do carimbo no hover (pincel/borracha); sem célula = só restaura o décor. */
+  const drawHoverPreview = useCallback((e: React.PointerEvent) => {
+    const st = useStudio.getState();
+    if (st.tool !== 'brush' && st.tool !== 'eraser') return;
+    const p = st.project;
+    const overlay = overlayRef.current;
+    if (!overlay || !p) return;
+    clearOverlay();
+    drawDecor();
+    const cell = cellFromEvent(e);
+    if (!cell) return;
+    const custom = st.brushShape === 'custom' ? st.customBrush : null;
+    const stamped = custom
+      ? customStamp(cell[0], cell[1], custom.mask, custom.w, custom.h, p.width, p.height)
+      : brushStamp(cell[0], cell[1], st.brushSize, st.brushShape === 'circle' ? 'circle' : 'square', p.width, p.height);
+    if (!stamped.length) return;
+    if (!overlay.width) {
+      overlay.width = p.width * st.zoom;
+      overlay.height = p.height * st.zoom;
+    }
+    const ctx = overlay.getContext('2d')!;
+    const z = st.zoom;
+    ctx.fillStyle = st.tool === 'eraser' ? 'rgba(255,80,80,0.35)' : 'rgba(255,255,255,0.30)';
+    let x0 = p.width, y0 = p.height, x1 = -1, y1 = -1;
+    for (const i of stamped) {
+      const px = i % p.width, py = Math.floor(i / p.width);
+      ctx.fillRect(px * z, py * z, z, z);
+      if (px < x0) x0 = px;
+      if (py < y0) y0 = py;
+      if (px > x1) x1 = px;
+      if (py > y1) y1 = py;
+    }
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+    ctx.strokeRect(x0 * z - 0.5, y0 * z - 0.5, (x1 - x0 + 1) * z + 1, (y1 - y0 + 1) * z + 1);
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.strokeRect(x0 * z + 0.5, y0 * z + 0.5, (x1 - x0 + 1) * z - 1, (y1 - y0 + 1) * z - 1);
+  }, [cellFromEvent, clearOverlay, drawDecor]);
+
+
   /* Overlay: ants (+ meta) estáticas sempre; ants animadas com a ferramenta select. */
   useEffect(() => {
     if (!selection) {
@@ -429,8 +508,8 @@ export default function PixelCanvas() {
     const st = useStudio.getState();
     const [x, y] = cell;
 
-    // conta-gotas: ferramenta própria ou Alt pressionado (lê o composto)
-    if (st.tool === 'picker' || e.altKey) {
+    // conta-gotas: ferramenta própria, ou Alt+clique (Alt+arrasto em formas = do centro)
+    if (st.tool === 'picker' || (e.altKey && st.tool !== 'line' && st.tool !== 'rect' && st.tool !== 'ellipse')) {
       const c = flattenCells(project, frame)[idx(x, y, project.width)];
       if (c) st.setColor(c);
       return;
@@ -553,19 +632,25 @@ export default function PixelCanvas() {
 
     if (st.tool === 'line' || st.tool === 'rect' || st.tool === 'ellipse') {
       drag.current = { drawing: true, startX: x, startY: y, erase, lastX: x, lastY: y, lastKey: '', trail: [], orig: null, mode: 'shape', moved: false, base: null, anchorId: null, hbDX: 0, hbDY: 0, hbResize: false, boneId: null };
-      drawOverlayShape(x, y, e.shiftKey);
+      drawOverlayShape(x, y, e.shiftKey, e.altKey);
       return;
     }
 
     st.beginStroke();
     // snapshot grátis: paint() é imutável, então a referência congela o pré-traço
     drag.current = { drawing: true, startX: x, startY: y, erase, lastX: x, lastY: y, lastKey: '', trail: [], orig: cel, mode: 'paint', moved: false, base: null, anchorId: null, hbDX: 0, hbDY: 0, hbResize: false, boneId: null };
-    applyStrokeTo(x, y, erase);
+    drag.current.pressure = e.pressure ?? 0;
+    drag.current.isPen = e.pointerType === 'pen';
+    const sc0 = strokeCell(e) ?? [x, y];
+    applyStrokeTo(sc0[0], sc0[1], erase);
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
     const d = drag.current;
-    if (!d?.drawing) return;
+    if (!d?.drawing) {
+      drawHoverPreview(e);
+      return;
+    }
     const cell = cellFromEvent(e);
     if (!cell) return;
     const st = useStudio.getState();
@@ -628,10 +713,14 @@ export default function PixelCanvas() {
       return;
     }
     if (st.tool === 'line' || st.tool === 'rect' || st.tool === 'ellipse') {
-      drawOverlayShape(x, y, e.shiftKey);
+      if (x !== d.startX || y !== d.startY) d.moved = true;
+      drawOverlayShape(x, y, e.shiftKey, e.altKey);
       return;
     }
-    applyStrokeTo(x, y, d.erase);
+    d.pressure = e.pressure ?? 0;
+    d.isPen = e.pointerType === 'pen';
+    const sc = strokeCell(e) ?? [x, y];
+    applyStrokeTo(sc[0], sc[1], d.erase);
   };
 
   const onPointerUp = (e: React.PointerEvent) => {
@@ -670,13 +759,24 @@ export default function PixelCanvas() {
       drawDecor(); // restaura ants + meta por baixo do preview da forma
       if (!cell || !project) return;
       const [x1, y1] = cell;
+      if (!d.moved && e.altKey) {
+        const f = st.currentFrameId ? project.frames[st.currentFrameId] : undefined;
+        const cc = f ? flattenCells(project, f)[idx(x1, y1, project.width)] : '';
+        if (cc) st.setColor(cc);
+        return;
+      }
       let pts: Array<[number, number]> = [];
-      if (st.tool === 'line') pts = linePoints(d.startX, d.startY, x1, y1);
-      else if (st.tool === 'rect') pts = rectPoints(d.startX, d.startY, x1, y1, e.shiftKey);
-      else {
-        const cx = (d.startX + x1) / 2;
-        const cy = (d.startY + y1) / 2;
-        pts = ellipsePoints(cx, cy, Math.abs(x1 - d.startX) / 2, Math.abs(y1 - d.startY) / 2, e.shiftKey);
+      if (st.tool === 'line') {
+        const [ex, ey] = e.shiftKey ? snapLineAngle(d.startX, d.startY, x1, y1) : [x1, y1];
+        pts = linePoints(d.startX, d.startY, ex, ey);
+      } else if (st.tool === 'rect') {
+        const [ax0, ay0, ax1, ay1] = shapeEnds(d.startX, d.startY, x1, y1, e.shiftKey, e.altKey);
+        pts = st.cornerRadius > 0
+          ? roundedRectPoints(ax0, ay0, ax1, ay1, st.cornerRadius, st.rectFilled)
+          : rectPoints(ax0, ay0, ax1, ay1, st.rectFilled);
+      } else {
+        const [ex0, ey0, ex1, ey1] = shapeEnds(d.startX, d.startY, x1, y1, e.shiftKey, e.altKey);
+        pts = ellipsePoints((ex0 + ex1) / 2, (ey0 + ey1) / 2, Math.abs(ex1 - ex0) / 2, Math.abs(ey1 - ey0) / 2, st.ellipseFilled);
       }
       const indices = new Set<number>();
       for (const [x, y] of pts) {
@@ -706,10 +806,8 @@ export default function PixelCanvas() {
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        onPointerLeave={() => {
-          if (drag.current && (tool === 'line' || tool === 'rect' || tool === 'ellipse')) {
-            // mantém o rastro; finaliza no pointerup global
-          }
+        onPointerLeave={(e) => {
+          if (!drag.current) drawHoverPreview(e);
         }}
         onContextMenu={(e) => e.preventDefault()}
       />

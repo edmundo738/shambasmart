@@ -200,3 +200,139 @@ export function countColors(cells: string[]): Array<{ color: string; count: numb
     .map(([color, count]) => ({ color, count }))
     .sort((a, b) => b.count - a.count);
 }
+
+/* ------------------------- E2: Brush Engine ------------------------- */
+
+export type BrushStampShape = 'square' | 'circle';
+
+/**
+ * Carimbo do pincel na mesma caixa do brushIndices
+ * (origem cx - floor(size/2), size×size).
+ * Círculo = centros de célula dentro do raio, com bias -0.1 anti-canto:
+ * 3px vira "plus" como nos editores (sem o bias seria um 3×3 cheio).
+ */
+export function brushStamp(
+  cx: number, cy: number, size: number, shape: BrushStampShape, w: number, h: number,
+): number[] {
+  const s = Math.max(1, Math.round(size));
+  const half = Math.floor(s / 2);
+  const ox = cx - half, oy = cy - half;
+  const out: number[] = [];
+  if (shape === 'square') {
+    for (let y = oy; y < oy + s; y++) {
+      for (let x = ox; x < ox + s; x++) {
+        if (inBounds(x, y, w, h)) out.push(idx(x, y, w));
+      }
+    }
+    return out;
+  }
+  const r = s / 2 - 0.1;
+  const ccx = ox + s / 2, ccy = oy + s / 2;
+  for (let y = oy; y < oy + s; y++) {
+    for (let x = ox; x < ox + s; x++) {
+      const dx = x + 0.5 - ccx, dy = y + 0.5 - ccy;
+      if (dx * dx + dy * dy > r * r) continue;
+      if (inBounds(x, y, w, h)) out.push(idx(x, y, w));
+    }
+  }
+  return out;
+}
+
+/** Carimbo custom: máscara centralizada no cursor (mesma convenção de origem). */
+export function customStamp(
+  cx: number, cy: number, mask: boolean[], mw: number, mh: number, w: number, h: number,
+): number[] {
+  const out: number[] = [];
+  if (mw <= 0 || mh <= 0 || mask.length !== mw * mh) return out;
+  const ox = cx - Math.floor(mw / 2), oy = cy - Math.floor(mh / 2);
+  for (let y = 0; y < mh; y++) {
+    for (let x = 0; x < mw; x++) {
+      if (!mask[y * mw + x]) continue;
+      const px = ox + x, py = oy + y;
+      if (inBounds(px, py, w, h)) out.push(idx(px, py, w));
+    }
+  }
+  return out;
+}
+
+/**
+ * Snap de ângulo p/ a ferramenta linha (Shift): endpoint em múltiplos de 45°,
+ * alcance = hipotenusa arredondada (ponta acompanha o cursor nas diagonais).
+ */
+export function snapLineAngle(x0: number, y0: number, x1: number, y1: number): [number, number] {
+  const dx = x1 - x0, dy = y1 - y0;
+  if (!dx && !dy) return [x0, y0];
+  const len = Math.round(Math.hypot(dx, dy));
+  const k = Math.round(Math.atan2(dy, dx) / (Math.PI / 4));
+  const a = (k * Math.PI) / 4;
+  return [x0 + Math.round(Math.cos(a) * len), y0 + Math.round(Math.sin(a) * len)];
+}
+
+/**
+ * Retângulo arredondado: r=0 é idêntico a rectPoints; cantos cortados por
+ * quarto de círculo simétrico (r=1 chanfra 1px por canto).
+ */
+export function roundedRectPoints(
+  x0: number, y0: number, x1: number, y1: number, r: number, filled: boolean,
+): Array<[number, number]> {
+  const xa = Math.min(x0, x1), xb = Math.max(x0, x1);
+  const ya = Math.min(y0, y1), yb = Math.max(y0, y1);
+  const rad = Math.max(0, Math.min(Math.round(r), Math.floor(Math.min(xb - xa + 1, yb - ya + 1) / 2)));
+  if (!rad) return rectPoints(xa, ya, xb, yb, filled);
+  const cut = (x: number, y: number): boolean => {
+    let i = -1, j = -1;
+    if (x >= xa && x < xa + rad) i = x - xa;
+    else if (x <= xb && x > xb - rad) i = xb - x;
+    else return false;
+    if (y >= ya && y < ya + rad) j = y - ya;
+    else if (y <= yb && y > yb - rad) j = yb - y;
+    else return false;
+    return (rad - i) * (rad - i) + (rad - j) * (rad - j) > rad * rad;
+  };
+  const inside = (x: number, y: number): boolean => {
+    if (x < xa || x > xb || y < ya || y > yb) return false;
+    return !cut(x, y);
+  };
+  const pts: Array<[number, number]> = [];
+  for (let y = ya; y <= yb; y++) {
+    for (let x = xa; x <= xb; x++) {
+      if (!inside(x, y)) continue;
+      if (filled) {
+        pts.push([x, y]);
+        continue;
+      }
+      if (!inside(x + 1, y) || !inside(x - 1, y) || !inside(x, y + 1) || !inside(x, y - 1)) {
+        pts.push([x, y]);
+      }
+    }
+  }
+  return pts;
+}
+
+/** Tamanho efetivo com pressão da caneta (mouse = inalterado). */
+export function pressureSize(base: number, pressure: number, isPen: boolean): number {
+  const b = Math.max(1, Math.round(base));
+  if (!isPen || !(pressure > 0)) return b;
+  const p = Math.max(0, Math.min(1, pressure));
+  return Math.max(1, Math.round(b * (0.3 + 0.7 * p)));
+}
+
+/**
+ * Normaliza extremidades de forma: square (Shift) = lado igual preservando o
+ * quadrante do arrasto; center (Alt) = ponto inicial vira o centro.
+ */
+export function shapeEnds(
+  x0: number, y0: number, x1: number, y1: number, square: boolean, center: boolean,
+): [number, number, number, number] {
+  let ax1 = x1, ay1 = y1;
+  if (square) {
+    const side = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+    ax1 = x0 + (x1 < x0 ? -side : side);
+    ay1 = y0 + (y1 < y0 ? -side : side);
+  }
+  if (center) {
+    const rx = Math.abs(ax1 - x0), ry = Math.abs(ay1 - y0);
+    return [x0 - rx, y0 - ry, x0 + rx, y0 + ry];
+  }
+  return [x0, y0, ax1, ay1];
+}

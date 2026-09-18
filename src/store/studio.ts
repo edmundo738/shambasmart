@@ -119,6 +119,21 @@ interface StudioState {
   setShowCanvasHandles: (b: boolean) => void;
   gridSize: 1 | 2 | 4 | 8;
   setGridSize: (n: 1 | 2 | 4 | 8) => void;
+  brushShape: 'square' | 'circle' | 'custom';
+  setBrushShape: (s: 'square' | 'circle' | 'custom') => void;
+  customBrush: { w: number; h: number; mask: boolean[] } | null;
+  captureBrushFromSelection: () => void;
+  clearCustomBrush: () => void;
+  stabilizer: number;
+  setStabilizer: (n: number) => void;
+  pressureSize: boolean;
+  togglePressureSize: () => void;
+  rectFilled: boolean;
+  toggleRectFilled: () => void;
+  ellipseFilled: boolean;
+  toggleEllipseFilled: () => void;
+  cornerRadius: number;
+  setCornerRadius: (n: number) => void;
   setPlaying: (b: boolean) => void;
   select: (animId: string | null, frameId?: string | null) => void;
   setVariation: (id: string) => void;
@@ -377,6 +392,13 @@ export const useStudio = create<StudioState>((set, get) => ({
   canvasDialogOpen: false,
   showCanvasHandles: false,
   gridSize: 1,
+  brushShape: 'square',
+  customBrush: null,
+  stabilizer: 0,
+  pressureSize: true,
+  rectFilled: false,
+  ellipseFilled: false,
+  cornerRadius: 2,
   playing: true,
   currentAnimationId: null,
   currentFrameId: null,
@@ -523,6 +545,35 @@ export const useStudio = create<StudioState>((set, get) => ({
   setCanvasDialogOpen: (canvasDialogOpen) => set({ canvasDialogOpen }),
   setShowCanvasHandles: (showCanvasHandles) => set({ showCanvasHandles }),
   setGridSize: (gridSize) => set({ gridSize }),
+  setBrushShape: (brushShape) => set({ brushShape }),
+  captureBrushFromSelection: () => set((s) => {
+    const p = s.project;
+    const sel = s.selection;
+    const f = s.currentFrameId ? p?.frames[s.currentFrameId] : undefined;
+    if (!p || !sel || !f) return {};
+    const x0 = Math.min(sel.x0, sel.x1), y0 = Math.min(sel.y0, sel.y1);
+    const w = Math.min(64, Math.max(sel.x0, sel.x1) - x0 + 1);
+    const h = Math.min(64, Math.max(sel.y0, sel.y1) - y0 + 1);
+    const cel = f.cels[s.currentLayerId ?? ''] ?? emptyCells(p.width, p.height);
+    const mask: boolean[] = [];
+    let any = false;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const px = x0 + x, py = y0 + y;
+        const op = px >= 0 && py >= 0 && px < p.width && py < p.height && !!cel[py * p.width + px];
+        mask.push(op);
+        if (op) any = true;
+      }
+    }
+    if (!any) return {};
+    return { customBrush: { w, h, mask }, brushShape: 'custom' };
+  }),
+  clearCustomBrush: () => set((s) => ({ customBrush: null, brushShape: s.brushShape === 'custom' ? 'square' : s.brushShape })),
+  setStabilizer: (stabilizer) => set({ stabilizer: Math.max(0, Math.min(8, Math.round(stabilizer))) }),
+  togglePressureSize: () => set((s) => ({ pressureSize: !s.pressureSize })),
+  toggleRectFilled: () => set((s) => ({ rectFilled: !s.rectFilled })),
+  toggleEllipseFilled: () => set((s) => ({ ellipseFilled: !s.ellipseFilled })),
+  setCornerRadius: (cornerRadius) => set({ cornerRadius: Math.max(0, Math.min(8, Math.round(cornerRadius))) }),
 
   select: (animId, frameId) => set((s) => {
     if (!s.project) return {};

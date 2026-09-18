@@ -6,6 +6,7 @@ import { useProjects } from '../store/projects';
 import TopBar from '../components/studio/TopBar';
 import Toolbar from '../components/studio/Toolbar';
 import CanvasStage from '../components/studio/CanvasStage';
+import ToolOptions from '../components/studio/ToolOptions';
 import Timeline from '../components/studio/Timeline';
 import AnimationsPanel from '../components/studio/AnimationsPanel';
 import VariationsPanel from '../components/studio/VariationsPanel';
@@ -219,6 +220,7 @@ export default function Studio() {
   return (
     <div className="flex h-full flex-col bg-ink-950">
       <TopBar onExport={() => setExportOpen(true)} />
+      <ToolOptions />
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 lg:flex-row lg:overflow-hidden">
         {/* rail de ferramentas */}

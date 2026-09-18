@@ -126,7 +126,7 @@ obrigatório em `docs/BENCHMARK.md` (referência × atual × alvo por sistema).
   MetaPanel, auto-fit, export JSON por frame (94 testes)
 - [x] **FASE D2 — Bones/FK**: esqueleto-guia editável (local/pai/mundo), render pixel-snapped
 - [ ] **FASE E — Editor Core**: E1 Canvas & Workspace Engine (navegação + canvas size
-  + trim + scale + flip + handles + grade; ENTREGUE) → E2 brush → E3 seleção/transform
+  + trim + scale + flip + handles + grade; ENTREGUE) → E2 brush (ENTREGUE) → E3 seleção/transform
   → E4 cor → E5 layers → E6 guias → E7 histórico
 - [ ] **FASE F — Rig+Motion**: IK two-bone + FABRIK com limites, 6 movimentos
   (idle/walk/run/jump/attack/hurt) com curvas + retargeting + edição pós-geração,

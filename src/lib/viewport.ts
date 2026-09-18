@@ -81,3 +81,17 @@ export function cellFromView(
   if (cell < 0 || cell >= docSize) return null;
   return cell;
 }
+
+/**
+ * Posição fracionária (sub-célula) — base do estabilizador.
+ * Igual a cellFromView, sem o floor.
+ */
+export function posFromView(
+  scroll: number, viewOffset: number, contentSize: number, docSize: number,
+): number | null {
+  if (!Number.isFinite(scroll) || !Number.isFinite(viewOffset)) return null;
+  if (contentSize <= 0 || docSize <= 0) return null;
+  const pos = ((scroll + viewOffset) / contentSize) * docSize;
+  if (pos < 0 || pos >= docSize) return null;
+  return pos;
+}

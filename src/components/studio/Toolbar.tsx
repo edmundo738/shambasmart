@@ -55,7 +55,7 @@ export default function Toolbar() {
       <div className="flex flex-col items-center gap-1" title="Tamanho do pincel ([ ])">
         <span className="text-[10px] font-semibold text-slate-500">{brushSize}px</span>
         <div className="grid grid-cols-2 gap-1">
-          {[1, 2, 3, 4].map((n) => (
+          {[1, 2, 3, 4, 6, 8].map((n) => (
             <button
               key={n}
               onClick={() => setBrushSize(n)}

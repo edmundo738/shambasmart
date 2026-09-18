@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { anchorFrac, cellFromView, centerScroll, clampZoom, fitZoom, keepAnchor, stepZoom, ZOOM_LADDER } from '../../src/lib/viewport';
+import { anchorFrac, cellFromView, centerScroll, clampZoom, fitZoom, keepAnchor, posFromView, stepZoom, ZOOM_LADDER } from '../../src/lib/viewport';
 
 describe('clampZoom', () => {
   it('arredonda e prende em 1..64', () => {
@@ -86,5 +86,18 @@ describe('cellFromView', () => {
     expect(cellFromView(0, -1, 384, 32)).toBeNull();
     expect(cellFromView(0, 384, 384, 32)).toBeNull();
     expect(cellFromView(0, 0, 0, 32)).toBeNull();
+  });
+});
+
+describe('posFromView', () => {
+  it('devolve a posição fracionária (zoom 12: célula 1 vai de 12 a 24)', () => {
+    expect(posFromView(0, 0, 384, 32)).toBe(0);
+    expect(posFromView(0, 18, 384, 32)).toBeCloseTo(1.5, 10);
+    expect(posFromView(0, 383.9, 384, 32)).toBeCloseTo(31.99, 2);
+  });
+  it('rejeita fora dos limites e dimensões inválidas', () => {
+    expect(posFromView(0, -0.1, 384, 32)).toBeNull();
+    expect(posFromView(0, 384, 384, 32)).toBeNull();
+    expect(posFromView(0, 0, 0, 32)).toBeNull();
   });
 });

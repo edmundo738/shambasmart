@@ -25,15 +25,17 @@ Legenda de status: ✅ sólido · 🟡 funcional mas amador · 🔴 ausente/frá
 - **TARGET:** rotação de canvas e bitmap infinito ficam DE FORA; navegação =
   content-bounded (como Aseprite); guias arrastáveis → E6.
 
-## DRAWING (desenho livre) 🟢 (A entregue; restos → E2)
+## DRAWING (desenho livre) 🟢 (A + E2 entregues)
 
 - **REFERENCE (Aseprite/Pixelorama):** interpolação entre eventos de ponteiro (nunca
   deixa falhas em traços rápidos); modo pixel-perfect (remove cantos duplos em
   diagonais 1px); coordenadas inteiras; pincel redondo/quadrado com preview do cursor.
-- **CURRENT (A entregue):** interpolação de traço entre células (sem falhas);
-  pixel-perfect 1px default ON (toggle `P`); pincel quadrado 1–4px; espelhos X/Y.
-  Falta: preview do pincel no hover; pincel redondo/custom; estabilização.
-- **TARGET:** preview no hover + pincel redondo/custom + estabilização (→ FASE E2).
+- **CURRENT (E2 entregue):** interpolação; pixel-perfect 1px (P); pincel
+  quadrado/redondo 1–8 + custom (captura da seleção, máscara colorida); preview do
+  carimbo no hover; estabilizador 0–8 (média móvel sub-célula); pressure-size real
+  p/ caneta (mouse inalterado); espelhos X/Y; borracha = brush completo.
+- **TARGET:** espaçamento do carimbo custom (contínuo hoje, como o default do
+  Aseprite); sem escopo novo.
 
 ## PIXEL TOOLS 🟡 → FASE A
 
@@ -42,10 +44,16 @@ Legenda de status: ✅ sólido · 🟡 funcional mas amador · 🔴 ausente/frá
   atalho, preview e undo corretos.
 - **CURRENT:** pincel, borracha, balde (contíguo, sem tolerância — correto p/ pixel art),
   conta-gotas (+Alt), linha/ret/elipse com preview em overlay e Shift, espelho X/Y,
-  grade. Atalhos B/E/G/I/L/R/O/M/T/N/P/X/Y/`[`/`]`. Bugs (1) `Y` e (4) `fillAt` morto
-  resolvidos; (2) undo do fill e (3) fidelidade do preview precisam re-verificação.
-- **TARGET:** re-verificar (2)(3); tolerância do balde fica de fora; Shift-quadrado/
-  Alt-centro/arredondado + auditar elipse (→ E2); polígono/laço/varinha (→ E3).
+  grade. Atalhos B/E/G/I/L/R/O/M/T/N/P/X/Y/`[`/`]`. Bugs (1)–(4) TODOS resolvidos —
+  (2) fill só empilha undo se mudou; (3) preview aplica espelho + preenchimento +
+  modificadores idênticos ao commit (E2 re-verificou por inspeção + paridade
+  preview/commit no código).
+- **CURRENT (E2):** linha com snap 45° (Shift); retângulo quadrado (Shift), do centro
+  (Alt), arredondado (raio 0–8), cheio/contorno; elipse círculo/centro/cheio
+  (algoritmo auditado: simetria H/V + anel ⊆ cheio); Alt+clique = conta-gotas;
+  barra de opções contextual por ferramenta.
+- **TARGET:** tolerância do balde fica de fora (pixel art = contíguo exato);
+  polígono/laço/varinha (→ E3).
 
 ## LAYERS 🟡 (B1 entregue; avançado → E5)
 
