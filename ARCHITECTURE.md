@@ -36,7 +36,9 @@
 ### Renderização
 
 - Editor: `<canvas>` com `image-rendering: pixelated`, pintura por célula, grade, onion skin,
-  overlay de formas (linha/retângulo/elipse), espelhamento, zoom 4–32x.
+  overlay de formas (linha/retângulo/elipse), rampas OKLab, preview de dithering,
+  máscaras de seleção + ants, espelhamento, zoom 4–32x. Geometria E3 vive em
+  `src/lib/selection.ts` e cor E4 em `src/lib/colorTools.ts`.
 - Reutilizável: `components/SpriteView.tsx` (`SpriteCanvas` estático + `AnimatedSprite` com rAF).
 - Export: `lib/exporters.ts` — spritesheet, JSON por engine (generic/phaser/godot/unity/gamemaker),
   GIF (`gifenc`, paleta global + transparência), pack ZIP (`jszip`) com manifesto + LEIAME.
@@ -61,6 +63,9 @@
 
 - **Pintura**: `PixelCanvas` (pointer events + captura) → `beginStroke()` → `paint(indices)` → autosave 900ms.
 - **Seleção/transform**: `M/V` → `SelectionMask` linear + bbox → `moveMasked`/`rotateMasked`/`scaleMasked` puros → store aplica um snapshot de undo → overlay redessina a mesma máscara. A seta V seleciona ilha opaca por flood-fill e move por inteiro; o mouse não conhece coordenadas fora da grade.
+- **Cor**: `colorTools` calcula rampas/shades em OKLab; `ditherColor` é a única decisão
+  de padrão e é reutilizada no stroke, fill e hover preview. A paleta recebe os tons
+  gerados para não criar pixels órfãos.
 - **Variações**: aplicadas em preview/export via `applyVariationToColor` (nunca no dado).
 - **Pack**: `buildPackZip` = ações × (original+variações) → PNG/JSON/GIF/frames + `pack.json`.
 - **Procgen → Studio**: Lab/Gerador produzem `ProjectData` (+`recipe`) → `saveProject` → `/studio/:id`.
@@ -129,7 +134,7 @@ obrigatório em `docs/BENCHMARK.md` (referência × atual × alvo por sistema).
 - [x] **FASE D2 — Bones/FK**: esqueleto-guia editável (local/pai/mundo), render pixel-snapped
 - [ ] **FASE E — Editor Core**: E1 Canvas & Workspace Engine (navegação + canvas size
   + trim + scale + flip + handles + grade; ENTREGUE) → E2 brush (ENTREGUE) → E3 seleção/transform (ENTREGUE)
-  → E4 cor → E5 layers → E6 guias → E7 histórico
+  → E4 cor (ENTREGUE) → E5 layers → E6 guias → E7 histórico
 - [ ] **FASE F — Rig+Motion**: IK two-bone + FABRIK com limites, 6 movimentos
   (idle/walk/run/jump/attack/hurt) com curvas + retargeting + edição pós-geração,
   tags por ação, modo silhueta no onion

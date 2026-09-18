@@ -12,6 +12,7 @@ import { clampAnchor, cloneFrameMeta, normalizeHitbox, opaqueBBox } from '../lib
 import { clonePose, normalizeDeg, solveFK, worldToLocal, wouldCycle } from '../lib/fk';
 import { createLayer, flattenCells, makeFrame, migrateProject } from '../lib/layers';
 import { normalizeHex } from '../lib/color';
+import { DitherPattern, shadeColor } from '../lib/colorTools';
 import { clampZoom } from '../lib/viewport';
 import {
   anchorOffset, CanvasAnchor, clampCanvasSize, clampSelRect, flipCellsH, flipCellsV, flipHitboxH,
@@ -64,6 +65,9 @@ interface StudioState {
   project: ProjectData | null;
   tool: ToolId;
   color: string;
+  secondaryColor: string;
+  ditherPattern: DitherPattern;
+  ditherStrength: number;
   brushSize: number;
   pixelPerfect: boolean;
   mirrorX: boolean;
@@ -95,6 +99,9 @@ interface StudioState {
   // seleção / ferramentas
   setTool: (t: ToolId) => void;
   setColor: (c: string) => void;
+  setSecondaryColor: (c: string) => void;
+  setDitherPattern: (pattern: DitherPattern) => void;
+  setDitherStrength: (n: number) => void;
   setBrushSize: (n: number) => void;
   togglePixelPerfect: () => void;
   toggleMirrorX: () => void;
@@ -237,7 +244,9 @@ interface StudioState {
   // paleta
   setPaletteSlot: (i: number, color: string) => void;
   addPaletteColor: (color: string) => void;
+  addPaletteColors: (colors: string[]) => void;
   removePaletteColor: (i: number) => void;
+  shadeSelection: (amount: number) => void;
   loadPalette: (colors: string[]) => void;
 
   // histórico
@@ -389,6 +398,9 @@ export const useStudio = create<StudioState>((set, get) => ({
   project: null,
   tool: 'brush',
   color: '#ff4d6d',
+  secondaryColor: '#10131d',
+  ditherPattern: 'solid',
+  ditherStrength: 0.5,
   brushSize: 1,
   pixelPerfect: true,
   mirrorX: false,
@@ -495,6 +507,9 @@ export const useStudio = create<StudioState>((set, get) => ({
 
   setTool: (tool) => set({ tool }),
   setColor: (color) => set({ color: normalizeHex(color) }),
+  setSecondaryColor: (secondaryColor) => set({ secondaryColor: normalizeHex(secondaryColor) }),
+  setDitherPattern: (ditherPattern) => set({ ditherPattern }),
+  setDitherStrength: (ditherStrength) => set({ ditherStrength: Math.max(0.05, Math.min(0.95, ditherStrength)) }),
   setBrushSize: (brushSize) => set({ brushSize: Math.max(1, Math.min(8, brushSize)) }),
   togglePixelPerfect: () => set((s) => ({ pixelPerfect: !s.pixelPerfect })),
   toggleMirrorX: () => set((s) => ({ mirrorX: !s.mirrorX })),
@@ -1515,6 +1530,40 @@ export const useStudio = create<StudioState>((set, get) => ({
     if (s.project.palette.includes(c)) return {};
     const hist = pushHistory(s);
     return { ...hist, project: { ...s.project, palette: [...s.project.palette, c], updatedAt: Date.now() } };
+  }),
+
+  addPaletteColors: (colors) => set((s) => {
+    if (!s.project) return {};
+    const palette = [...s.project.palette];
+    for (const c of colors.map(normalizeHex)) if (!palette.includes(c)) palette.push(c);
+    if (palette.length === s.project.palette.length) return {};
+    return { ...pushHistory(s), project: { ...s.project, palette, updatedAt: Date.now() } };
+  }),
+
+  shadeSelection: (amount) => set((s) => {
+    if (!s.project || !s.selection || !Number.isFinite(amount) || !amount) return {};
+    const layer = currentLayer(s.project, s.currentLayerId);
+    if (layer.locked) return {};
+    const frame = s.project.frames[s.currentFrameId ?? ''];
+    if (!frame) return {};
+    const mask = s.selectionMask ?? rectMask(s.project.width, s.project.height, s.selection);
+    const cells = [...(frame.cels[layer.id] ?? emptyCells(s.project.width, s.project.height))];
+    const palette = [...s.project.palette];
+    let changed = false;
+    for (let i = 0; i < cells.length && i < mask.length; i++) {
+      if (!mask[i] || !cells[i]) continue;
+      const next = shadeColor(cells[i], amount);
+      if (next === cells[i]) continue;
+      cells[i] = next;
+      if (!palette.includes(next)) palette.push(next);
+      changed = true;
+    }
+    if (!changed) return {};
+    return {
+      ...pushHistory(s),
+      project: { ...s.project, palette, frames: { ...s.project.frames, [frame.id]: { ...frame, cels: { ...frame.cels, [layer.id]: cells } } }, updatedAt: Date.now() },
+      dirty: true,
+    };
   }),
 
   removePaletteColor: (i) => set((s) => {

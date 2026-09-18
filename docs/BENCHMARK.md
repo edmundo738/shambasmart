@@ -108,12 +108,15 @@ Legenda de status: ✅ sólido · 🟡 funcional mas amador · 🔴 ausente/frá
 - **TARGET:** combinar seleções (add/subtract/intersect) e tolerância de cor da varinha
   (deliberadamente fora deste corte para não introduzir heurística escondida).
 
-## PALETTE 🟡 (B2 entregue; cor avançada → E4)
+## PALETTE 🟢 (E4 entregue — cor, rampas, dithering, shading)
 
 - **REFERENCE:** paleta indexada, slots, importar/exportar (.gpl/.pal), rampas, lock de cor.
-- **CURRENT (B2 entregue):** slots editáveis + undo + importar/exportar `.gpl`;
-  conta-gotas (+Alt). Sem rampas/recentes/favoritos.
-- **TARGET:** rampas + dithering + shading (→ FASE E4); ASE/ACT/JSON depois.
+- **CURRENT (E4):** slots editáveis + undo + `.gpl`; rampas e sombras interpoladas em
+  OKLab (2–32 cores); dithering sólido/checker/Bayer 2×2/Bayer 4×4 com segunda cor,
+  densidade e preview real no pincel e no balde; escurecer/iluminar a seleção altera
+  pixels e registra as novas cores na paleta.
+- **TARGET:** rampas editáveis por nó, recentes/favoritos, ASE/ACT/JSON e lock de cor;
+  tolerância perceptual da varinha continua separada (não esconder heurística no E4).
 
 ## RIG / BONES / IK / MESH / SKIN 🟡 → FASE D/E
 
@@ -267,3 +270,13 @@ Legenda de status: ✅ sólido · 🟡 funcional mas amador · 🔴 ausente/frá
    move uma ilha opaca sem obrigar o usuário a entender seleção.
 4. Rotação ±90° e escala 2×/½× são integer-safe, sem blur, com undo transacional.
 5. Testes E3: 7 algoritmos novos; suíte total atual: 16 arquivos / 191 testes verdes.
+
+## Veredito E4 — Cor
+
+1. `src/lib/colorTools.ts`: OKLab roundtrip, rampas inclusivas, shade ramp, shadeColor e
+   matrizes Bayer puras e determinísticas.
+2. Barra contextual do pincel: segunda cor, sólido/checker/Bayer 2×2/Bayer 4×4 e densidade.
+3. Dither é aplicado de verdade ao stroke e ao fill, com o mesmo `ditherColor` no preview.
+4. PalettePanel: preview/adicionar rampa, adicionar sombras, escurecer/iluminar seleção;
+   tudo com undo e novas cores incluídas na paleta.
+5. Testes E4: 6 novos; suíte total atual: 19 arquivos / 200 testes verdes.

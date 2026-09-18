@@ -6,6 +6,7 @@ import { parseGpl, serializeGpl } from '../../lib/palette';
 import { countColors } from '../../lib/pixels';
 import { flattenCells } from '../../lib/layers';
 import { normalizeHex } from '../../lib/color';
+import { buildColorRamp, buildShadeRamp } from '../../lib/colorTools';
 
 export default function PalettePanel() {
   const project = useStudio((s) => s.project);
@@ -13,10 +14,15 @@ export default function PalettePanel() {
   const setColor = useStudio((s) => s.setColor);
   const setPaletteSlot = useStudio((s) => s.setPaletteSlot);
   const addPaletteColor = useStudio((s) => s.addPaletteColor);
+  const addPaletteColors = useStudio((s) => s.addPaletteColors);
   const removePaletteColor = useStudio((s) => s.removePaletteColor);
+  const shadeSelection = useStudio((s) => s.shadeSelection);
+  const selection = useStudio((s) => s.selection);
   const loadPalette = useStudio((s) => s.loadPalette);
   const currentFrameId = useStudio((s) => s.currentFrameId);
   const [editing, setEditing] = useState<number | null>(null);
+  const [rampEnd, setRampEnd] = useState('#ffd23f');
+  const [rampSteps, setRampSteps] = useState(5);
   const fileRef = useRef<HTMLInputElement>(null);
 
   if (!project) return null;
@@ -86,6 +92,34 @@ export default function PalettePanel() {
               <Plus size={14} />
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* E4: rampas perceptuais + sombreamento real na seleção */}
+      <div className="rounded-xl border border-ink-700 bg-ink-900/60 p-3">
+        <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Rampas OKLab</div>
+        <div className="flex items-center gap-2">
+          <span className="h-7 w-7 rounded border border-ink-700" style={{ background: color }} title="Início: cor atual" />
+          <span className="text-slate-600">→</span>
+          <label className="h-7 w-7 cursor-pointer rounded border border-ink-700" style={{ background: rampEnd }} title="Fim da rampa">
+            <input type="color" value={rampEnd} onChange={(e) => setRampEnd(e.target.value)} className="h-full w-full cursor-pointer opacity-0" />
+          </label>
+          <label className="flex flex-1 items-center gap-2 text-[10px] text-slate-400">
+            {rampSteps} passos
+            <input type="range" min={2} max={12} value={rampSteps} onChange={(e) => setRampSteps(Number(e.target.value))} className="w-full" />
+          </label>
+        </div>
+        <div className="mt-2 flex h-6 overflow-hidden rounded border border-ink-700">
+          {buildColorRamp(color, rampEnd, rampSteps).map((c, i) => <span key={`${c}-${i}`} className="flex-1" style={{ background: c }} />)}
+        </div>
+        <div className="mt-2 flex gap-2">
+          <button onClick={() => addPaletteColors(buildColorRamp(color, rampEnd, rampSteps))} className="flex-1 rounded-md border border-forge-500/40 px-2 py-1.5 text-[11px] font-semibold text-forge-300 hover:bg-forge-500/10">Adicionar rampa</button>
+          <button onClick={() => addPaletteColors(buildShadeRamp(color, rampSteps))} className="flex-1 rounded-md border border-ink-700 px-2 py-1.5 text-[11px] text-slate-300 hover:bg-ink-800">Adicionar sombra</button>
+        </div>
+        <div className="mt-2 flex items-center gap-2 border-t border-ink-800 pt-2">
+          <span className="text-[10px] text-slate-500">Na seleção:</span>
+          <button disabled={!selection} onClick={() => shadeSelection(-0.12)} className="rounded border border-ink-700 px-2 py-1 text-[10px] text-slate-300 hover:bg-ink-800 disabled:opacity-40">Escurecer</button>
+          <button disabled={!selection} onClick={() => shadeSelection(0.12)} className="rounded border border-ink-700 px-2 py-1 text-[10px] text-slate-300 hover:bg-ink-800 disabled:opacity-40">Iluminar</button>
         </div>
       </div>
 

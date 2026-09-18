@@ -18,6 +18,12 @@ export default function ToolOptions() {
   const setStabilizer = useStudio((s) => s.setStabilizer);
   const pressureSize = useStudio((s) => s.pressureSize);
   const togglePressureSize = useStudio((s) => s.togglePressureSize);
+  const secondaryColor = useStudio((s) => s.secondaryColor);
+  const setSecondaryColor = useStudio((s) => s.setSecondaryColor);
+  const ditherPattern = useStudio((s) => s.ditherPattern);
+  const setDitherPattern = useStudio((s) => s.setDitherPattern);
+  const ditherStrength = useStudio((s) => s.ditherStrength);
+  const setDitherStrength = useStudio((s) => s.setDitherStrength);
   const rectFilled = useStudio((s) => s.rectFilled);
   const toggleRectFilled = useStudio((s) => s.toggleRectFilled);
   const ellipseFilled = useStudio((s) => s.ellipseFilled);
@@ -82,6 +88,20 @@ export default function ToolOptions() {
           <button onClick={togglePressureSize} title="Tamanho pela pressão da caneta (mouse não muda)" className={`flex items-center gap-1 rounded-md border px-2 py-1.5 text-[11px] font-semibold ${pressureSize ? 'border-forge-500/50 bg-forge-500/10 text-forge-300' : 'border-ink-700 text-slate-400'}`}>
             <PenLine size={13} /> Pressão
           </button>
+          {tool === 'brush' && (
+            <>
+              <label className="flex items-center gap-1 text-[11px] text-slate-400" title="Segunda cor do dithering">
+                2ª <input type="color" value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} className="h-6 w-6 cursor-pointer rounded border border-ink-700 bg-transparent" />
+              </label>
+              <select value={ditherPattern} onChange={(e) => setDitherPattern(e.target.value as 'solid' | 'checker' | 'bayer2' | 'bayer4')} title="Padrão de dithering" className="h-7 rounded-md border border-ink-700 bg-ink-950 px-1.5 text-[10px] text-slate-300">
+                <option value="solid">Sólido</option>
+                <option value="checker">Checker</option>
+                <option value="bayer2">Bayer 2×2</option>
+                <option value="bayer4">Bayer 4×4</option>
+              </select>
+              {ditherPattern !== 'solid' && <input type="range" min={5} max={95} value={Math.round(ditherStrength * 100)} onChange={(e) => setDitherStrength(Number(e.target.value) / 100)} title="Densidade do dithering" className="w-16" />}
+            </>
+          )}
         </>
       )}
 

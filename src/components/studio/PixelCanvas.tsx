@@ -19,6 +19,7 @@ import { pickAnchor, pointInHitbox } from '../../lib/frameMeta';
 import { angleTo, distToSegment, normalizeDeg, snapWorldBone, solveFK, worldToLocal, WorldBone } from '../../lib/fk';
 import { cellFromView, posFromView } from '../../lib/viewport';
 import { ellipseMask, lassoMask, pointInMask, rectMask } from '../../lib/selection';
+import { ditherColor } from '../../lib/colorTools';
 
 export default function PixelCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -185,7 +186,9 @@ export default function PixelCanvas() {
     const seg = linePoints(d.lastX, d.lastY, x, y);
     d.lastX = x;
     d.lastY = y;
-    const color = erase ? '' : st.color;
+    const ink = (px: number, py: number) => erase
+      ? ''
+      : ditherColor(st.color, st.secondaryColor, st.ditherPattern, px, py, st.ditherStrength);
     const usePP = st.pixelPerfect && st.brushSize === 1 && st.brushShape !== 'custom' && !st.mirrorX && !st.mirrorY && d.orig !== null;
 
     if (usePP) {
@@ -200,7 +203,7 @@ export default function PixelCanvas() {
           }
         }
         for (const [px, py] of step.paint) {
-          if (inBounds(px, py, p.width, p.height)) patches.push([idx(px, py, p.width), color]);
+          if (inBounds(px, py, p.width, p.height)) patches.push([idx(px, py, p.width), ink(px, py)]);
         }
       }
       d.trail = trail;
@@ -224,10 +227,12 @@ export default function PixelCanvas() {
       }
     }
     if (!indices.size) return;
-    const key = `${erase ? 'e' : color}|${[...indices].sort((a, b) => a - b).join(',')}`;
+    const sorted = [...indices].sort((a, b) => a - b);
+    const key = `${erase ? 'e' : `${st.color}/${st.secondaryColor}/${st.ditherPattern}/${st.ditherStrength}`}|${sorted.join(',')}`;
     if (key === d.lastKey) return;
     d.lastKey = key;
-    st.paint([...indices], erase ? null : st.color);
+    if (erase || st.ditherPattern === 'solid') st.paint(sorted, erase ? null : st.color);
+    else st.paintPatch(sorted.map((i) => [i, ink(i % p.width, Math.floor(i / p.width))]));
   }, []);
 
   const drawOverlayShape = useCallback((x1: number, y1: number, shiftKey: boolean, altKey: boolean) => {
@@ -489,10 +494,14 @@ export default function PixelCanvas() {
     }
     const ctx = overlay.getContext('2d')!;
     const z = st.zoom;
-    ctx.fillStyle = st.tool === 'eraser' ? 'rgba(255,80,80,0.35)' : 'rgba(255,255,255,0.30)';
     let x0 = p.width, y0 = p.height, x1 = -1, y1 = -1;
     for (const i of stamped) {
       const px = i % p.width, py = Math.floor(i / p.width);
+      ctx.fillStyle = st.tool === 'eraser'
+        ? 'rgba(255,80,80,0.35)'
+        : st.ditherPattern === 'solid'
+          ? 'rgba(255,255,255,0.30)'
+          : `${ditherColor(st.color, st.secondaryColor, st.ditherPattern, px, py, st.ditherStrength)}99`;
       ctx.fillRect(px * z, py * z, z, z);
       if (px < x0) x0 = px;
       if (py < y0) y0 = py;
@@ -696,7 +705,8 @@ export default function PixelCanvas() {
       // só empilha undo se algo realmente mudou
       if (changed.length) {
         st.beginStroke();
-        st.paint(changed, erase ? null : st.color);
+        if (erase || st.ditherPattern === 'solid') st.paint(changed, erase ? null : st.color);
+        else st.paintPatch(changed.map((i): [number, string] => [i, ditherColor(st.color, st.secondaryColor, st.ditherPattern, i % project.width, Math.floor(i / project.width), st.ditherStrength)]));
       }
       return;
     }
