@@ -24,8 +24,14 @@ export default function ToolOptions() {
   const toggleEllipseFilled = useStudio((s) => s.toggleEllipseFilled);
   const cornerRadius = useStudio((s) => s.cornerRadius);
   const setCornerRadius = useStudio((s) => s.setCornerRadius);
+  const selectionShape = useStudio((s) => s.selectionShape);
+  const setSelectionShape = useStudio((s) => s.setSelectionShape);
+  const transformMode = useStudio((s) => s.transformMode);
+  const setTransformMode = useStudio((s) => s.setTransformMode);
+  const rotateSelection = useStudio((s) => s.rotateSelection);
+  const scaleSelection = useStudio((s) => s.scaleSelection);
 
-  if (tool !== 'brush' && tool !== 'eraser' && tool !== 'line' && tool !== 'rect' && tool !== 'ellipse') {
+  if (tool !== 'brush' && tool !== 'eraser' && tool !== 'line' && tool !== 'rect' && tool !== 'ellipse' && tool !== 'select' && tool !== 'transform') {
     return null;
   }
 
@@ -76,6 +82,44 @@ export default function ToolOptions() {
           <button onClick={togglePressureSize} title="Tamanho pela pressão da caneta (mouse não muda)" className={`flex items-center gap-1 rounded-md border px-2 py-1.5 text-[11px] font-semibold ${pressureSize ? 'border-forge-500/50 bg-forge-500/10 text-forge-300' : 'border-ink-700 text-slate-400'}`}>
             <PenLine size={13} /> Pressão
           </button>
+        </>
+      )}
+
+      {tool === 'select' && (
+        <>
+          <span className={label}>Seleção</span>
+          <div className="flex gap-1">
+            {([
+              ['rect', 'Retângulo'], ['ellipse', 'Elipse'], ['lasso', 'Laço livre'], ['wand', 'Varinha'],
+            ] as const).map(([shape, name]) => (
+              <button key={shape} onClick={() => setSelectionShape(shape)} className={`rounded-md border px-2 py-1.5 text-[11px] font-semibold ${selectionShape === shape ? 'border-forge-400 bg-forge-500/25 text-forge-200' : 'border-ink-700 text-slate-400 hover:bg-ink-800 hover:text-white'}`} title={name}>
+                {name}
+              </button>
+            ))}
+          </div>
+          <span className={hint}>arrastar = máscara · <kbd className="text-slate-300">Shift</kbd> move 8px · <kbd className="text-slate-300">Esc</kbd> cancela</span>
+        </>
+      )}
+
+      {tool === 'transform' && (
+        <>
+          <span className={label}>Seta</span>
+          <div className="flex gap-1">
+            {([
+              ['move', 'Mover'], ['object', 'Objeto'], ['push', 'Empurrar'],
+            ] as const).map(([mode, name]) => (
+              <button key={mode} onClick={() => setTransformMode(mode)} className={`rounded-md border px-2 py-1.5 text-[11px] font-semibold ${transformMode === mode ? 'border-forge-400 bg-forge-500/25 text-forge-200' : 'border-ink-700 text-slate-400 hover:bg-ink-800 hover:text-white'}`} title={name}>
+                {name}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-1 border-l border-ink-700 pl-2">
+            <button disabled={!selection} onClick={() => rotateSelection(false)} className="rounded-md border border-ink-700 px-2 py-1.5 text-[11px] text-slate-300 hover:bg-ink-800 disabled:opacity-40" title="Rodar 90 graus anti-horário">↶ 90°</button>
+            <button disabled={!selection} onClick={() => rotateSelection(true)} className="rounded-md border border-ink-700 px-2 py-1.5 text-[11px] text-slate-300 hover:bg-ink-800 disabled:opacity-40" title="Rodar 90 graus horário">↷ 90°</button>
+            <button disabled={!selection} onClick={() => scaleSelection(2)} className="rounded-md border border-ink-700 px-2 py-1.5 text-[11px] text-slate-300 hover:bg-ink-800 disabled:opacity-40" title="Escala nearest 2×">2×</button>
+            <button disabled={!selection} onClick={() => scaleSelection(0.5)} className="rounded-md border border-ink-700 px-2 py-1.5 text-[11px] text-slate-300 hover:bg-ink-800 disabled:opacity-40" title="Escala nearest ½">½×</button>
+          </div>
+          <span className={hint}>clique+arraste objecto · sem blur</span>
         </>
       )}
 

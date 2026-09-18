@@ -1,9 +1,12 @@
 import { create } from 'zustand';
 import {
   Animation, Bone, BonePose, Cell, Frame, FrameAnchor, FrameHitbox, FramePose, Layer, ORIGINAL_VARIATION_ID, PlayMode,
-  ProjectData, SelRect, ToolId, Variation, uid,
+  ProjectData, SelRect, SelectionShape, ToolId, TransformMode, Variation, uid,
 } from '../types';
-import { emptyCells, moveRect } from '../lib/pixels';
+import { emptyCells } from '../lib/pixels';
+import {
+  maskBounds, moveMasked, objectMask, rectMask, rotateMasked, scaleMasked, SelectionMask,
+} from '../lib/selection';
 import { clampMs, fpsToMs, frameMs, moveIdTo } from '../lib/timeline';
 import { clampAnchor, cloneFrameMeta, normalizeHitbox, opaqueBBox } from '../lib/frameMeta';
 import { clonePose, normalizeDeg, solveFK, worldToLocal, wouldCycle } from '../lib/fk';
@@ -148,12 +151,22 @@ interface StudioState {
   toggleLayerLock: (id: string) => void;
   setLayerOpacity: (id: string, opacity: number) => void;
 
-  // seleção
+  // seleção + transformação pixel-safe (E3)
   selection: SelRect | null;
+  selectionMask: SelectionMask | null;
+  selectionShape: SelectionShape;
   setSelection: (r: SelRect | null) => void;
+  setSelectionMask: (mask: SelectionMask | null, shape?: SelectionShape) => void;
+  setSelectionShape: (shape: SelectionShape) => void;
   moveSelection: (dx: number, dy: number) => void;
   moveSelectionLive: (dx: number, dy: number) => void;
   deleteSelection: () => void;
+  rotateSelection: (clockwise: boolean) => void;
+  scaleSelection: (factor: number) => void;
+  selectObjectAt: (x: number, y: number) => void;
+  pushObject: (dx: number, dy: number) => void;
+  transformMode: TransformMode;
+  setTransformMode: (mode: TransformMode) => void;
 
   // pintura
   beginStroke: () => void;
@@ -260,6 +273,9 @@ function applyCanvasRemap(
     ...hist,
     project: { ...p, width: newW, height: newH, frames, rig: newRig, updatedAt: Date.now() },
     selection: s.selection ? clampSelRect(selFn(s.selection), newW, newH) : null,
+    // remapeamentos de canvas mudam o buffer; a seleção é vista, não é dado persistido.
+    selectionMask: null,
+    selectionShape: 'rect',
   };
 }
 
@@ -287,7 +303,8 @@ function applyMove(
   const frame = project.frames[s.currentFrameId ?? ''];
   if (!frame) return {};
   const cel = frame.cels[layer.id] ?? emptyCells(project.width, project.height);
-  const moved = moveRect(cel, project.width, project.height, selection, dx, dy);
+  const mask = s.selectionMask ?? rectMask(project.width, project.height, selection);
+  const moved = moveMasked(cel, project.width, project.height, mask, dx, dy);
   return {
     ...hist,
     project: {
@@ -295,7 +312,8 @@ function applyMove(
       frames: { ...project.frames, [frame.id]: { ...frame, cels: { ...frame.cels, [layer.id]: moved.cells } } },
       updatedAt: Date.now(),
     },
-    selection: moved.rect,
+    selection: { x0: selection.x0 + dx, y0: selection.y0 + dy, x1: selection.x1 + dx, y1: selection.y1 + dy },
+    selectionMask: moved.mask,
     dirty: true,
   };
 }
@@ -404,6 +422,9 @@ export const useStudio = create<StudioState>((set, get) => ({
   currentFrameId: null,
   currentLayerId: null,
   selection: null,
+  selectionMask: null,
+  selectionShape: 'rect',
+  transformMode: 'move',
   frameClipboard: null,
   variationId: ORIGINAL_VARIATION_ID,
   past: [],
@@ -418,6 +439,9 @@ export const useStudio = create<StudioState>((set, get) => ({
     currentFrameId: project.animations[0]?.frameIds[0] ?? null,
     currentLayerId: project.layers[project.layers.length - 1]?.id ?? null,
     selection: null,
+    selectionMask: null,
+    selectionShape: 'rect',
+    transformMode: 'move',
     frameClipboard: null,
     poseClipboard: null,
     selectedBoneId: null,
@@ -560,7 +584,8 @@ export const useStudio = create<StudioState>((set, get) => ({
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         const px = x0 + x, py = y0 + y;
-        const op = px >= 0 && py >= 0 && px < p.width && py < p.height && !!cel[py * p.width + px];
+        const selected = !s.selectionMask || (px >= 0 && py >= 0 && px < p.width && py < p.height && !!s.selectionMask[py * p.width + px]);
+        const op = selected && px >= 0 && py >= 0 && px < p.width && py < p.height && !!cel[py * p.width + px];
         mask.push(op);
         if (op) any = true;
       }
@@ -685,7 +710,29 @@ export const useStudio = create<StudioState>((set, get) => ({
     };
   }),
 
-  setSelection: (selection) => set({ selection }),
+  setSelection: (selection) => set((s) => ({
+    selection,
+    selectionMask: selection && s.project ? rectMask(s.project.width, s.project.height, selection) : null,
+    selectionShape: 'rect',
+  })),
+
+  setSelectionMask: (mask, shape = 'rect') => set((s) => {
+    if (!mask || !s.project) return { selection: null, selectionMask: null, selectionShape: shape };
+    return { selection: maskBounds(mask, s.project.width, s.project.height), selectionMask: mask, selectionShape: shape };
+  }),
+
+  setSelectionShape: (selectionShape) => set({ selectionShape }),
+  setTransformMode: (transformMode) => set({ transformMode }),
+
+  selectObjectAt: (x, y) => set((s) => {
+    if (!s.project || !s.currentFrameId) return {};
+    const layer = currentLayer(s.project, s.currentLayerId);
+    const frame = s.project.frames[s.currentFrameId];
+    if (!frame) return {};
+    const cel = frame.cels[layer.id] ?? emptyCells(s.project.width, s.project.height);
+    const mask = objectMask(cel, s.project.width, s.project.height, x, y);
+    return { selection: maskBounds(mask, s.project.width, s.project.height), selectionMask: mask, selectionShape: 'wand' };
+  }),
 
   moveSelection: (dx, dy) => set((s) => {
     if (!s.project || !s.selection || (!dx && !dy)) return {};
@@ -707,17 +754,11 @@ export const useStudio = create<StudioState>((set, get) => ({
     if (layer.locked) return {};
     const hist = pushHistory(s);
     const { width: w, height: h } = s.project;
-    const sel = s.selection;
-    const x0 = Math.max(0, Math.min(sel.x0, sel.x1));
-    const y0 = Math.max(0, Math.min(sel.y0, sel.y1));
-    const x1 = Math.min(w - 1, Math.max(sel.x0, sel.x1));
-    const y1 = Math.min(h - 1, Math.max(sel.y0, sel.y1));
+    const mask = s.selectionMask ?? rectMask(w, h, s.selection);
     const frame = s.project.frames[s.currentFrameId ?? ''];
     if (!frame) return {};
     const cells = [...(frame.cels[layer.id] ?? emptyCells(w, h))];
-    for (let y = y0; y <= y1; y++) {
-      for (let x = x0; x <= x1; x++) cells[y * w + x] = '';
-    }
+    for (let i = 0; i < mask.length && i < cells.length; i++) if (mask[i]) cells[i] = '';
     return {
       ...hist,
       project: {
@@ -725,7 +766,47 @@ export const useStudio = create<StudioState>((set, get) => ({
         frames: { ...s.project.frames, [frame.id]: { ...frame, cels: { ...frame.cels, [layer.id]: cells } } },
         updatedAt: Date.now(),
       },
+      dirty: true,
     };
+  }),
+
+  rotateSelection: (clockwise) => set((s) => {
+    if (!s.project || !s.selection) return {};
+    const layer = currentLayer(s.project, s.currentLayerId);
+    if (layer.locked) return {};
+    const frame = s.project.frames[s.currentFrameId ?? ''];
+    if (!frame) return {};
+    const mask = s.selectionMask ?? rectMask(s.project.width, s.project.height, s.selection);
+    const cel = frame.cels[layer.id] ?? emptyCells(s.project.width, s.project.height);
+    const out = rotateMasked(cel, s.project.width, s.project.height, mask, s.selection, clockwise);
+    return {
+      ...pushHistory(s),
+      project: { ...s.project, frames: { ...s.project.frames, [frame.id]: { ...frame, cels: { ...frame.cels, [layer.id]: out.cells } } }, updatedAt: Date.now() },
+      selection: out.rect, selectionMask: out.mask, dirty: true,
+    };
+  }),
+
+  scaleSelection: (factor) => set((s) => {
+    if (!s.project || !s.selection || !Number.isFinite(factor) || factor <= 0) return {};
+    const layer = currentLayer(s.project, s.currentLayerId);
+    if (layer.locked) return {};
+    const frame = s.project.frames[s.currentFrameId ?? ''];
+    if (!frame) return {};
+    const mask = s.selectionMask ?? rectMask(s.project.width, s.project.height, s.selection);
+    const cel = frame.cels[layer.id] ?? emptyCells(s.project.width, s.project.height);
+    const out = scaleMasked(cel, s.project.width, s.project.height, mask, s.selection, factor);
+    return {
+      ...pushHistory(s),
+      project: { ...s.project, frames: { ...s.project.frames, [frame.id]: { ...frame, cels: { ...frame.cels, [layer.id]: out.cells } } }, updatedAt: Date.now() },
+      selection: out.rect, selectionMask: out.mask, dirty: true,
+    };
+  }),
+
+  pushObject: (dx, dy) => set((s) => {
+    if (!s.selection || (!dx && !dy)) return {};
+    const layer = s.project ? currentLayer(s.project, s.currentLayerId) : null;
+    if (!s.project || !layer || layer.locked) return {};
+    return applyMove(s, s.project, s.selection, pushHistory(s), dx, dy);
   }),
 
   beginStroke: () => set((s) => pushHistory(s)),

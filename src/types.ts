@@ -123,7 +123,11 @@ export interface ProjectData {
   updatedAt: number;
 }
 
-export type ToolId = 'brush' | 'eraser' | 'fill' | 'picker' | 'line' | 'rect' | 'ellipse' | 'select' | 'meta' | 'bone';
+export type ToolId = 'brush' | 'eraser' | 'fill' | 'picker' | 'line' | 'rect' | 'ellipse' | 'select' | 'transform' | 'meta' | 'bone';
+
+/** Geometria da seleção E3; máscaras continuam pixel-perfect e têm bbox para mover/transformar. */
+export type SelectionShape = 'rect' | 'ellipse' | 'lasso' | 'wand';
+export type TransformMode = 'move' | 'object' | 'push';
 
 /** Seleção retangular (coordenadas inclusivas, normalizadas: x0<=x1, y0<=y1). */
 export interface SelRect {

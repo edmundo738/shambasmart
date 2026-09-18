@@ -9,7 +9,7 @@ import PixelCanvas from './PixelCanvas';
 const TOOL_LABEL: Record<ToolId, string> = {
   brush: 'Pincel', eraser: 'Borracha', fill: 'Balde', picker: 'Conta-gotas',
   line: 'Linha', rect: 'Retângulo', ellipse: 'Elipse', select: 'Seleção',
-  meta: 'Âncoras', bone: 'Osso',
+  transform: 'Mover / Objeto', meta: 'Âncoras', bone: 'Osso',
 };
 
 type HandleId = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';

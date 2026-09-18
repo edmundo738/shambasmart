@@ -153,7 +153,7 @@ export default function Studio() {
         }
         case 'delete':
         case 'backspace': {
-          if (st.tool === 'select' && st.selection) {
+          if ((st.tool === 'select' || st.tool === 'transform') && st.selection) {
             e.preventDefault();
             st.deleteSelection();
           }
@@ -168,7 +168,7 @@ export default function Studio() {
         case 'arrowdown':
         case 'arrowright':
         case 'arrowleft': {
-          if (st.tool === 'select' && st.selection) {
+          if ((st.tool === 'select' || st.tool === 'transform') && st.selection) {
             e.preventDefault();
             const step = e.shiftKey ? 8 : 1;
             const k = e.key.toLowerCase();

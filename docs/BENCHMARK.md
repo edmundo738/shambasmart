@@ -87,20 +87,26 @@ Legenda de status: ✅ sólido · 🟡 funcional mas amador · 🔴 ausente/frá
   + ghosts das poses do rig. Sem modo outline-only/silhueta.
 - **TARGET:** modo silhueta/outline-only (→ F).
 
-## TRANSFORMS 🟡 (B2 parcial; rot/escala → E3)
+## TRANSFORMS 🟢 (E3 entregue — mover/objeto/empurrar + rot/escala)
 
 - **REFERENCE (Aseprite RotSprite):** seleção com pivô, mover/rotacionar/escalar com
   algoritmos pixel-safe (nearest, rotação que preserva clusters); flip H/V da seleção.
-- **CURRENT (B2 entregue):** seleção retangular + mover (arrastar/setas) + flip H/V
-  com composite determinístico. Sem rot/escala.
-- **TARGET:** rot/escala pixel-safe estilo RotSprite/rotxel (→ FASE E3). Skew/
-  perspectiva livres ficam DE FORA (conflitam com pixel-perfect).
+- **CURRENT (E3):** ferramenta seta `V` com modos **Mover** (clique-arrasta a ilha sem
+  exigir pré-seleção), **Selecionar objeto** (ilha opaca 4-conectada) e **Empurrar**;
+  caixa de transformação no overlay; rotação ortogonal ±90°; escala nearest 2×/½×;
+  transparência não apaga o destino e cada operação tem um undo.
+- **TARGET:** pivô livre/transformação contínua só se mantiver pixel-perfect; skew e
+  perspectiva ficam DE FORA (conflitam com a promessa de pixels inteiros).
 
-## SELECTION 🟡 (B2 parcial; resto → E3)
+## SELECTION 🟢 (E3 entregue)
 
 - **REFERENCE:** retângulo, elipse, laço, varinha; flutuar seleção; Esc cancela.
-- **CURRENT (B2 entregue):** retângulo + mover + Esc + Delete.
-- **TARGET:** elipse/laço/varinha + flutuar (→ FASE E3).
+- **CURRENT (E3):** `M` expande para máscaras de retângulo, elipse, laço even-odd e
+  varinha exacta 4-vizinhos; marching ants segue a máscara, não uma bbox falsa;
+  mover conserva a máscara; Delete, setas e `Esc` funcionam. Captura de custom brush
+  respeita a máscara, e o transform usa a mesma representação compacta linear.
+- **TARGET:** combinar seleções (add/subtract/intersect) e tolerância de cor da varinha
+  (deliberadamente fora deste corte para não introduzir heurística escondida).
 
 ## PALETTE 🟡 (B2 entregue; cor avançada → E4)
 
@@ -251,3 +257,13 @@ Legenda de status: ✅ sólido · 🟡 funcional mas amador · 🔴 ausente/frá
 7. Arrasto = 1 undo (`beginStroke` + live); Esc reverte sem tocar na seleção de pixels.
 8. Duplicar/copiar/colar frames carregam metadados; JSONs de export trazem `anchors`+`hitbox` por frame.
 9. Testes: `frameMeta` (6) + `store/frameMeta` (6) — suíte em 94/94.
+
+## Veredito E3 — Seleção + Transform
+
+1. `src/lib/selection.ts`: máscaras lineares para retângulo/elipse/laço/varinha/objeto,
+   bbox, move flutuante, rotação ortogonal e escala nearest; todos puros.
+2. `M` escolhe a geometria na barra contextual; ants desenha a fronteira real da máscara.
+3. `V` abre a ferramenta seta com modos Mover, Selecionar objeto e Empurrar; clique-arrasto
+   move uma ilha opaca sem obrigar o usuário a entender seleção.
+4. Rotação ±90° e escala 2×/½× são integer-safe, sem blur, com undo transacional.
+5. Testes E3: 7 algoritmos novos; suíte total atual: 16 arquivos / 191 testes verdes.

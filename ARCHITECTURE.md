@@ -27,8 +27,9 @@
 
 ### Stores (Zustand)
 
-- `store/studio.ts` — projeto aberto + estado do editor (tool, cor, seleção, zoom, onion...),
-  histórico undo/redo (snapshots de frames+animações, limite 60), CRUD de frames/ações/variações/paleta.
+- `store/studio.ts` — projeto aberto + estado do editor (tool, cor, seleção, máscaras E3,
+  ferramenta seta, zoom, onion...), histórico undo/redo (snapshots de frames+animações,
+  limite 60), CRUD de frames/ações/variações/paleta.
 - `store/projects.ts` — persistência localStorage (`pixelforge_project_*` + metas com thumbnail).
 - `store/auth.ts` — conta/plano simulados (MVP local).
 
@@ -59,6 +60,7 @@
 ### Fluxos principais
 
 - **Pintura**: `PixelCanvas` (pointer events + captura) → `beginStroke()` → `paint(indices)` → autosave 900ms.
+- **Seleção/transform**: `M/V` → `SelectionMask` linear + bbox → `moveMasked`/`rotateMasked`/`scaleMasked` puros → store aplica um snapshot de undo → overlay redessina a mesma máscara. A seta V seleciona ilha opaca por flood-fill e move por inteiro; o mouse não conhece coordenadas fora da grade.
 - **Variações**: aplicadas em preview/export via `applyVariationToColor` (nunca no dado).
 - **Pack**: `buildPackZip` = ações × (original+variações) → PNG/JSON/GIF/frames + `pack.json`.
 - **Procgen → Studio**: Lab/Gerador produzem `ProjectData` (+`recipe`) → `saveProject` → `/studio/:id`.
@@ -126,7 +128,7 @@ obrigatório em `docs/BENCHMARK.md` (referência × atual × alvo por sistema).
   MetaPanel, auto-fit, export JSON por frame (94 testes)
 - [x] **FASE D2 — Bones/FK**: esqueleto-guia editável (local/pai/mundo), render pixel-snapped
 - [ ] **FASE E — Editor Core**: E1 Canvas & Workspace Engine (navegação + canvas size
-  + trim + scale + flip + handles + grade; ENTREGUE) → E2 brush (ENTREGUE) → E3 seleção/transform
+  + trim + scale + flip + handles + grade; ENTREGUE) → E2 brush (ENTREGUE) → E3 seleção/transform (ENTREGUE)
   → E4 cor → E5 layers → E6 guias → E7 histórico
 - [ ] **FASE F — Rig+Motion**: IK two-bone + FABRIK com limites, 6 movimentos
   (idle/walk/run/jump/attack/hurt) com curvas + retargeting + edição pós-geração,

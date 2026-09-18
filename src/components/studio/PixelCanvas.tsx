@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useStudio } from '../../store/studio';
-import { SelRect } from '../../types';
+import { SelRect, SelectionShape } from '../../types';
 
 function normSel(r: SelRect): SelRect {
   return { x0: Math.min(r.x0, r.x1), y0: Math.min(r.y0, r.y1), x1: Math.max(r.x0, r.x1), y1: Math.max(r.y0, r.y1) };
 }
-function pointInSel(x: number, y: number, r: SelRect): boolean {
+function pointInSel(x: number, y: number, r: SelRect, mask: boolean[] | null, w: number, h: number): boolean {
+  if (mask) return pointInMask(mask, x, y, w, h);
   const n = normSel(r);
   return x >= n.x0 && x <= n.x1 && y >= n.y0 && y <= n.y1;
 }
@@ -17,6 +18,7 @@ import { compositeStack, flattenCells } from '../../lib/layers';
 import { pickAnchor, pointInHitbox } from '../../lib/frameMeta';
 import { angleTo, distToSegment, normalizeDeg, snapWorldBone, solveFK, worldToLocal, WorldBone } from '../../lib/fk';
 import { cellFromView, posFromView } from '../../lib/viewport';
+import { ellipseMask, lassoMask, pointInMask, rectMask } from '../../lib/selection';
 
 export default function PixelCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -25,8 +27,8 @@ export default function PixelCanvas() {
     drawing: boolean; startX: number; startY: number; erase: boolean;
     lastX: number; lastY: number; lastKey: string;
     trail: Array<[number, number]>; orig: string[] | null;
-    mode: 'paint' | 'shape' | 'marquee' | 'move' | 'anchor' | 'hitbox' | 'metadraw' | 'bonepose' | 'bonerot';
-    moved: boolean; base: SelRect | null;
+    mode: 'paint' | 'shape' | 'marquee' | 'move' | 'transform' | 'anchor' | 'hitbox' | 'metadraw' | 'bonepose' | 'bonerot';
+    moved: boolean; base: SelRect | null; baseMask?: boolean[] | null; points?: Array<[number, number]>;
     anchorId: string | null; hbDX: number; hbDY: number; hbResize: boolean; boneId: string | null;
     pressure?: number; isPen?: boolean; stab?: Array<[number, number]>;
   } | null>(null);
@@ -49,6 +51,8 @@ export default function PixelCanvas() {
   const onionTintNext = useStudio((s) => s.onionTintNext);
   const zoom = useStudio((s) => s.zoom);
   const selection = useStudio((s) => s.selection);
+  const selectionMask = useStudio((s) => s.selectionMask);
+  const selectionShape = useStudio((s) => s.selectionShape);
   const showMeta = useStudio((s) => s.showMeta);
   const showRig = useStudio((s) => s.showRig);
   const selectedBoneId = useStudio((s) => s.selectedBoneId);
@@ -278,25 +282,39 @@ export default function PixelCanvas() {
     overlay.height = pr.height * st.zoom;
     const ctx = overlay.getContext('2d')!;
     ctx.imageSmoothingEnabled = false;
-    const n = normSel(sel);
-    const x0 = Math.max(0, n.x0) * st.zoom;
-    const y0 = Math.max(0, n.y0) * st.zoom;
-    const x1 = (Math.min(pr.width - 1, n.x1) + 1) * st.zoom;
-    const y1 = (Math.min(pr.height - 1, n.y1) + 1) * st.zoom;
-    if (x1 <= x0 || y1 <= y0) return;
+    const mask = st.selectionMask;
     ctx.lineWidth = 1;
     ctx.setLineDash([4, 4]);
     ctx.lineDashOffset = -offset;
-    ctx.strokeStyle = 'rgba(0,0,0,0.9)';
-    ctx.strokeRect(x0 + 0.5, y0 + 0.5, x1 - x0 - 1, y1 - y0 - 1);
+    // Borda de cada célula que não tem vizinho selecionado: funciona para
+    // retângulo, elipse, laço e objeto sem fingir uma bbox rectangular.
+    const edge = (stroke: string) => {
+      ctx.strokeStyle = stroke;
+      ctx.beginPath();
+      if (mask) {
+        for (let y = 0; y < pr.height; y++) for (let x = 0; x < pr.width; x++) {
+          if (!mask[y * pr.width + x]) continue;
+          const at = (xx: number, yy: number) => xx >= 0 && yy >= 0 && xx < pr.width && yy < pr.height && !!mask[yy * pr.width + xx];
+          const z = st.zoom;
+          if (!at(x, y - 1)) { ctx.moveTo(x * z, y * z + 0.5); ctx.lineTo((x + 1) * z, y * z + 0.5); }
+          if (!at(x + 1, y)) { ctx.moveTo((x + 1) * z - 0.5, y * z); ctx.lineTo((x + 1) * z - 0.5, (y + 1) * z); }
+          if (!at(x, y + 1)) { ctx.moveTo(x * z, (y + 1) * z - 0.5); ctx.lineTo((x + 1) * z, (y + 1) * z - 0.5); }
+          if (!at(x - 1, y)) { ctx.moveTo(x * z + 0.5, y * z); ctx.lineTo(x * z + 0.5, (y + 1) * z); }
+        }
+      } else {
+        const n = normSel(sel);
+        ctx.rect(n.x0 * st.zoom + 0.5, n.y0 * st.zoom + 0.5, (n.x1 - n.x0 + 1) * st.zoom - 1, (n.y1 - n.y0 + 1) * st.zoom - 1);
+      }
+      ctx.stroke();
+    };
+    edge('rgba(0,0,0,0.9)');
     ctx.lineDashOffset = -offset + 4;
-    ctx.strokeStyle = 'rgba(255,255,255,0.95)';
-    ctx.strokeRect(x0 + 0.5, y0 + 0.5, x1 - x0 - 1, y1 - y0 - 1);
+    edge('rgba(255,255,255,0.95)');
     ctx.setLineDash([]);
   }, []);
 
-  /** Laço elástico durante o arrasto do marquee. */
-  const drawMarqueeLive = useCallback((ax: number, ay: number, bx: number, by: number) => {
+  /** Preview geométrico de seleção: mesma máscara que será commitada no pointer-up. */
+  const drawMarqueeLive = useCallback((ax: number, ay: number, bx: number, by: number, shape: SelectionShape = 'rect', trail: Array<[number, number]> = []) => {
     const overlay = overlayRef.current;
     const st = useStudio.getState();
     const pr = st.project;
@@ -304,15 +322,23 @@ export default function PixelCanvas() {
     overlay.width = pr.width * st.zoom;
     overlay.height = pr.height * st.zoom;
     const ctx = overlay.getContext('2d')!;
-    const n = normSel({ x0: ax, y0: ay, x1: bx, y1: by });
-    const x0 = n.x0 * st.zoom, y0 = n.y0 * st.zoom;
-    const rw = (n.x1 - n.x0 + 1) * st.zoom, rh = (n.y1 - n.y0 + 1) * st.zoom;
+    const rect = normSel({ x0: ax, y0: ay, x1: bx, y1: by });
+    const mask = shape === 'ellipse' ? ellipseMask(pr.width, pr.height, rect)
+      : shape === 'lasso' ? lassoMask(pr.width, pr.height, trail.length ? trail : [[ax, ay], [bx, by], [ax, ay]])
+      : rectMask(pr.width, pr.height, rect);
     ctx.fillStyle = 'rgba(99,102,241,0.15)';
-    ctx.fillRect(x0, y0, rw, rh);
+    for (let i = 0; i < mask.length; i++) if (mask[i]) ctx.fillRect((i % pr.width) * st.zoom, Math.floor(i / pr.width) * st.zoom, st.zoom, st.zoom);
     ctx.lineWidth = 1;
     ctx.setLineDash([4, 4]);
     ctx.strokeStyle = '#fff';
-    ctx.strokeRect(x0 + 0.5, y0 + 0.5, rw - 1, rh - 1);
+    if (shape === 'lasso' && trail.length > 1) {
+      ctx.beginPath();
+      ctx.moveTo(trail[0][0] * st.zoom + st.zoom / 2, trail[0][1] * st.zoom + st.zoom / 2);
+      for (const [x, y] of trail.slice(1)) ctx.lineTo(x * st.zoom + st.zoom / 2, y * st.zoom + st.zoom / 2);
+      ctx.stroke();
+    } else {
+      ctx.strokeRect(rect.x0 * st.zoom + 0.5, rect.y0 * st.zoom + 0.5, (rect.x1 - rect.x0 + 1) * st.zoom - 1, (rect.y1 - rect.y0 + 1) * st.zoom - 1);
+    }
     ctx.setLineDash([]);
   }, []);
 
@@ -417,11 +443,29 @@ export default function PixelCanvas() {
     paint(f.pose, '#22d3ee', '#ffffff', 1, st.selectedBoneId);
   }, []);
 
+  const drawTransformBox = useCallback(() => {
+    const st = useStudio.getState();
+    const pr = st.project;
+    const overlay = overlayRef.current;
+    if (!overlay || !pr || st.tool !== 'transform' || !st.selection) return;
+    const r = normSel(st.selection), z = st.zoom;
+    const ctx = overlay.getContext('2d')!;
+    ctx.save();
+    ctx.setLineDash([2, 2]);
+    ctx.strokeStyle = '#22d3ee';
+    ctx.strokeRect(r.x0 * z + 0.5, r.y0 * z + 0.5, (r.x1 - r.x0 + 1) * z - 1, (r.y1 - r.y0 + 1) * z - 1);
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#22d3ee';
+    for (const [x, y] of [[r.x0, r.y0], [r.x1, r.y0], [r.x0, r.y1], [r.x1, r.y1]]) ctx.fillRect(x * z + z / 2 - 2, y * z + z / 2 - 2, 4, 4);
+    ctx.restore();
+  }, []);
+
   const drawDecor = useCallback(() => {
     drawAnts(0);
     drawMeta();
     drawRig();
-  }, [drawAnts, drawMeta, drawRig]);
+    drawTransformBox();
+  }, [drawAnts, drawMeta, drawRig, drawTransformBox]);
 
   /** Fantasma do carimbo no hover (pincel/borracha); sem célula = só restaura o décor. */
   const drawHoverPreview = useCallback((e: React.PointerEvent) => {
@@ -473,24 +517,26 @@ export default function PixelCanvas() {
       return;
     }
     drawDecor();
-    if (tool !== 'select') return;
+    if (tool !== 'select' && tool !== 'transform') return;
     let off = 0;
     const t = setInterval(() => { off = (off + 2) % 16; drawAnts(off); drawMeta(); drawRig(); }, 120);
     return () => clearInterval(t);
-  }, [selection, zoom, tool, frame, showMeta, showRig, selectedBoneId, clearOverlay, drawAnts, drawMeta, drawRig, drawDecor]);
+  }, [selection, selectionMask, selectionShape, zoom, tool, frame, showMeta, showRig, selectedBoneId, clearOverlay, drawAnts, drawMeta, drawRig, drawDecor]);
 
   /* Esc durante marquee/arrasto: cancela (arrasto reverte pixels + retângulo). */
   useEffect(() => {
     const onEsc = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       const d = drag.current;
-      if (!d || (d.mode !== 'move' && d.mode !== 'marquee' && d.mode !== 'anchor' && d.mode !== 'hitbox' && d.mode !== 'metadraw' && d.mode !== 'bonepose' && d.mode !== 'bonerot')) return;
+      if (!d || (d.mode !== 'move' && d.mode !== 'transform' && d.mode !== 'marquee' && d.mode !== 'anchor' && d.mode !== 'hitbox' && d.mode !== 'metadraw' && d.mode !== 'bonepose' && d.mode !== 'bonerot')) return;
       e.preventDefault();
       e.stopPropagation();
       const st = useStudio.getState();
-      if ((d.mode === 'move' || d.mode === 'anchor' || d.mode === 'hitbox' || d.mode === 'bonepose' || d.mode === 'bonerot') && d.moved) st.undo();
-      if (d.mode === 'move') st.setSelection(d.base ? { ...d.base } : null);
-      else if (d.mode === 'marquee') st.setSelection(null);
+      if ((d.mode === 'move' || d.mode === 'transform' || d.mode === 'anchor' || d.mode === 'hitbox' || d.mode === 'bonepose' || d.mode === 'bonerot') && d.moved) st.undo();
+      if (d.mode === 'move' || d.mode === 'transform') {
+        if (d.baseMask) st.setSelectionMask([...d.baseMask], st.selectionShape);
+        else st.setSelection(d.base ? { ...d.base } : null);
+      } else if (d.mode === 'marquee') st.setSelection(null);
       drag.current = null;
       clearOverlay();
       drawDecor();
@@ -516,22 +562,47 @@ export default function PixelCanvas() {
     }
 
     if (st.tool === 'select') {
+      // Varinha é um clique determinístico, não um marquee.
+      if (st.selectionShape === 'wand') {
+        const layer = project.layers.find((l) => l.id === st.currentLayerId) ?? project.layers[project.layers.length - 1];
+        if (!layer?.locked) st.selectObjectAt(x, y);
+        return;
+      }
       const sel = st.selection;
-      if (sel && pointInSel(x, y, sel)) {
+      if (sel && pointInSel(x, y, sel, st.selectionMask, project.width, project.height)) {
         const layer = project.layers.find((l) => l.id === st.currentLayerId) ?? project.layers[project.layers.length - 1];
         if (layer?.locked) return;
         st.beginStroke(); // baseline: arrasto inteiro = 1 undo
         drag.current = {
           drawing: true, startX: x, startY: y, erase: false, lastX: x, lastY: y,
-          lastKey: '', trail: [], orig: null, mode: 'move', moved: false, base: { ...sel }, anchorId: null, hbDX: 0, hbDY: 0, hbResize: false, boneId: null,
+          lastKey: '', trail: [], orig: null, mode: 'move', moved: false, base: { ...sel }, baseMask: st.selectionMask ? [...st.selectionMask] : null, points: [], anchorId: null, hbDX: 0, hbDY: 0, hbResize: false, boneId: null,
         };
       } else {
         st.setSelection(null);
         drag.current = {
           drawing: true, startX: x, startY: y, erase: false, lastX: x, lastY: y,
-          lastKey: '', trail: [], orig: null, mode: 'marquee', moved: false, base: null, anchorId: null, hbDX: 0, hbDY: 0, hbResize: false, boneId: null,
+          lastKey: '', trail: [], orig: null, mode: 'marquee', moved: false, base: null, baseMask: null, points: [[x, y]], anchorId: null, hbDX: 0, hbDY: 0, hbResize: false, boneId: null,
         };
       }
+      return;
+    }
+
+    // Ferramenta seta V: move qualquer ilha com clique-arrasto; não obriga o
+    // iniciante a criar uma seleção antes. O modo "objeto" só seleciona.
+    if (st.tool === 'transform') {
+      const layer = project.layers.find((l) => l.id === st.currentLayerId) ?? project.layers[project.layers.length - 1];
+      if (layer?.locked) return;
+      if (st.transformMode === 'object' || !st.selection || !pointInSel(x, y, st.selection, st.selectionMask, project.width, project.height)) {
+        st.selectObjectAt(x, y);
+      }
+      const next = useStudio.getState();
+      if (!next.selection) return;
+      if (st.transformMode === 'object') return;
+      next.beginStroke();
+      drag.current = {
+        drawing: true, startX: x, startY: y, erase: false, lastX: x, lastY: y,
+        lastKey: '', trail: [], orig: null, mode: 'transform', moved: false, base: { ...next.selection }, baseMask: next.selectionMask ? [...next.selectionMask] : null, points: [], anchorId: null, hbDX: 0, hbDY: 0, hbResize: false, boneId: null,
+      };
       return;
     }
 
@@ -700,11 +771,17 @@ export default function PixelCanvas() {
       return;
     }
     if (d.mode === 'marquee') {
-      drawMarqueeLive(d.startX, d.startY, x, y);
+      if (selectionShape === 'lasso') {
+        const last = d.points?.[d.points.length - 1];
+        if (!last || last[0] !== x || last[1] !== y) d.points = [...(d.points ?? []), [x, y]];
+      }
+      clearOverlay();
+      drawDecor();
+      drawMarqueeLive(d.startX, d.startY, x, y, selectionShape, d.points ?? []);
       d.moved = x !== d.startX || y !== d.startY;
       return;
     }
-    if (d.mode === 'move') {
+    if (d.mode === 'move' || d.mode === 'transform') {
       const dx = x - d.lastX, dy = y - d.lastY;
       if (dx || dy) {
         st.moveSelectionLive(dx, dy);
@@ -747,12 +824,22 @@ export default function PixelCanvas() {
       clearOverlay();
       if (cell && project) {
         const [x1, y1] = cell;
-        if (x1 === d.startX && y1 === d.startY) st.setSelection(null);
-        else st.setSelection(normSel({ x0: d.startX, y0: d.startY, x1, y1 }));
+        if (!d.moved && selectionShape !== 'wand') st.setSelection(null);
+        else {
+          const rect = normSel({ x0: d.startX, y0: d.startY, x1, y1 });
+          const points = [...(d.points ?? [[d.startX, d.startY]])];
+          const lastPoint = points[points.length - 1];
+          if (selectionShape === 'lasso' && (!lastPoint || lastPoint[0] !== x1 || lastPoint[1] !== y1)) points.push([x1, y1]);
+          const mask = selectionShape === 'ellipse' ? ellipseMask(project.width, project.height, rect)
+            : selectionShape === 'lasso' ? lassoMask(project.width, project.height, points)
+            : rectMask(project.width, project.height, rect);
+          st.setSelectionMask(mask, selectionShape);
+        }
       }
+      drawDecor();
       return;
     }
-    if (d.mode === 'move') return; // undo único já garantido pelo beginStroke do down
+    if (d.mode === 'move' || d.mode === 'transform') return; // undo único já garantido pelo beginStroke do down
     if (st.tool === 'line' || st.tool === 'rect' || st.tool === 'ellipse') {
       const cell = cellFromEvent(e);
       clearOverlay();

@@ -1,7 +1,8 @@
 import {
-  Anchor, Bone, BoxSelect, Brush, Circle, Crosshair, Eraser, FlipHorizontal2, FlipVertical2, Ghost, Grid3x3, PaintBucket, Pipette,
-  Slash, Square,
+  Anchor, Bone, BoxSelect, Brush, ChevronDown, Circle, Crosshair, Eraser, FlipHorizontal2, FlipVertical2, Ghost, Grid3x3,
+  Hand, MousePointer2, MousePointerClick, PaintBucket, Pipette, Slash, Square,
 } from 'lucide-react';
+import { useState } from 'react';
 import { useStudio } from '../../store/studio';
 import { ToolId } from '../../types';
 
@@ -11,6 +12,7 @@ const TOOLS: Array<{ id: ToolId; icon: React.ReactNode; label: string; hint: str
   { id: 'fill', icon: <PaintBucket size={18} />, label: 'Balde', hint: 'G' },
   { id: 'picker', icon: <Pipette size={18} />, label: 'Conta-gotas', hint: 'I' },
   { id: 'select', icon: <BoxSelect size={18} />, label: 'Selecionar', hint: 'M' },
+  { id: 'transform', icon: <MousePointer2 size={18} />, label: 'Mover / Objeto', hint: 'V' },
   { id: 'meta', icon: <Anchor size={18} />, label: 'Âncoras', hint: 'T' },
   { id: 'bone', icon: <Bone size={18} />, label: 'Ossos', hint: 'N' },
   { id: 'line', icon: <Slash size={18} />, label: 'Linha', hint: 'L' },
@@ -21,6 +23,9 @@ const TOOLS: Array<{ id: ToolId; icon: React.ReactNode; label: string; hint: str
 export default function Toolbar() {
   const tool = useStudio((s) => s.tool);
   const setTool = useStudio((s) => s.setTool);
+  const transformMode = useStudio((s) => s.transformMode);
+  const setTransformMode = useStudio((s) => s.setTransformMode);
+  const [transformOpen, setTransformOpen] = useState(false);
   const brushSize = useStudio((s) => s.brushSize);
   const setBrushSize = useStudio((s) => s.setBrushSize);
   const mirrorX = useStudio((s) => s.mirrorX);
@@ -43,7 +48,31 @@ export default function Toolbar() {
 
   return (
     <div className="pf-shadow flex w-14 flex-col items-center gap-1 rounded-xl border border-ink-700 bg-ink-900/90 p-2">
-      {TOOLS.map((t) => (
+      {TOOLS.map((t) => t.id === 'transform' ? (
+        <div key={t.id} className="relative">
+          <button
+            title={`${t.label} (${t.hint}) — abre modos`}
+            onClick={() => { setTool('transform'); setTransformMode('move'); setTransformOpen((v) => !v); }}
+            className={btn(tool === t.id)}
+          >
+            {t.icon}
+            <ChevronDown size={9} className="absolute bottom-1 right-1 text-forge-300" />
+          </button>
+          {(transformOpen || tool === 'transform') && (
+            <div className="absolute left-12 top-0 z-30 flex w-40 flex-col gap-1 rounded-lg border border-ink-600 bg-ink-950/95 p-1.5 shadow-2xl">
+              {[
+                ['move', 'Mover', <Hand size={14} />, 'V · clicar e arrastar'],
+                ['object', 'Selecionar objeto', <MousePointerClick size={14} />, 'clique numa ilha opaca'],
+                ['push', 'Empurrar', <MousePointer2 size={14} />, 'arrastar/nudge pixel-safe'],
+              ].map(([mode, label, icon, hint]) => (
+                <button key={mode as string} onClick={() => { setTool('transform'); setTransformMode(mode as 'move' | 'object' | 'push'); setTransformOpen(false); }} className={`flex items-center gap-2 rounded px-2 py-1.5 text-left text-[11px] ${transformMode === mode ? 'bg-forge-500/20 text-forge-200' : 'text-slate-300 hover:bg-ink-800'}`}>
+                  {icon}<span><b className="block">{label}</b><small className="text-[9px] text-slate-500">{hint}</small></span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
         <button key={t.id} title={`${t.label} (${t.hint})`} onClick={() => setTool(t.id)} className={btn(tool === t.id)}>
           {t.icon}
         </button>
