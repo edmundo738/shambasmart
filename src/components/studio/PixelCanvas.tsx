@@ -14,7 +14,7 @@ import {
   brushStamp, customStamp, ellipsePoints, emptyCells, floodFill, idx, inBounds, linePoints, mirrorPoints,
   pixelPerfectStep, pressureSize, rectPoints, roundedRectPoints, shapeEnds, snapLineAngle,
 } from '../../lib/pixels';
-import { compositeStack, flattenCells } from '../../lib/layers';
+import { canvasBlendMode, compositeStack, flattenCells } from '../../lib/layers';
 import { pickAnchor, pointInHitbox } from '../../lib/frameMeta';
 import { angleTo, distToSegment, normalizeDeg, snapWorldBone, solveFK, worldToLocal, WorldBone } from '../../lib/fk';
 import { cellFromView, posFromView } from '../../lib/viewport';
@@ -95,9 +95,10 @@ export default function PixelCanvas() {
     }
 
     // pixels do frame, camada por camada (com opacidade)
-    for (const { layer, cells } of compositeStack(project, frame)) {
-      if (layer.opacity <= 0) continue;
-      ctx.globalAlpha = Math.max(0, Math.min(1, layer.opacity / 100));
+    for (const { layer, cells, opacity, blendMode } of compositeStack(project, frame)) {
+      if (opacity <= 0) continue;
+      ctx.globalCompositeOperation = canvasBlendMode(blendMode);
+      ctx.globalAlpha = Math.max(0, Math.min(1, opacity / 100));
       for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
           const c = cells[y * w + x];
@@ -108,6 +109,7 @@ export default function PixelCanvas() {
       }
     }
     ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
 
     // grade: menor a cada gridSize, maior a cada 8x (tile-friendly)
     if (showGrid) {
@@ -580,7 +582,7 @@ export default function PixelCanvas() {
       const sel = st.selection;
       if (sel && pointInSel(x, y, sel, st.selectionMask, project.width, project.height)) {
         const layer = project.layers.find((l) => l.id === st.currentLayerId) ?? project.layers[project.layers.length - 1];
-        if (layer?.locked) return;
+        if (layer?.locked || layer?.kind === 'group') return;
         st.beginStroke(); // baseline: arrasto inteiro = 1 undo
         drag.current = {
           drawing: true, startX: x, startY: y, erase: false, lastX: x, lastY: y,
@@ -600,7 +602,7 @@ export default function PixelCanvas() {
     // iniciante a criar uma seleção antes. O modo "objeto" só seleciona.
     if (st.tool === 'transform') {
       const layer = project.layers.find((l) => l.id === st.currentLayerId) ?? project.layers[project.layers.length - 1];
-      if (layer?.locked) return;
+      if (layer?.locked || layer?.kind === 'group') return;
       if (st.transformMode === 'object' || !st.selection || !pointInSel(x, y, st.selection, st.selectionMask, project.width, project.height)) {
         st.selectObjectAt(x, y);
       }
@@ -697,7 +699,7 @@ export default function PixelCanvas() {
 
     const erase = e.button === 2 || st.tool === 'eraser';
     const layer = project.layers.find((l) => l.id === st.currentLayerId) ?? project.layers[project.layers.length - 1];
-    if (layer?.locked) return; // camada travada: sem pintura
+    if (layer?.locked || layer?.kind === 'group') return; // grupo não recebe pixels
     const cel = frame.cels[layer.id] ?? emptyCells(project.width, project.height);
 
     if (st.tool === 'fill') {

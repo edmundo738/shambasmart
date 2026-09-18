@@ -19,10 +19,11 @@
 
 ### Modelo de dados (`src/types.ts`)
 
-- `Frame { id, cells: string[] }` — `""` = transparente, senão `#rrggbb`.
+- `Frame { id, cels: Record<layerId, string[]> }` — `""` = transparente, senão `#rrggbb`; cada raster tem o seu cel por frame.
 - `Animation { id, name, fps, frameIds[] }` — ação = sequência ordenada de frames.
 - `Variation { id, name, mapping, hue, sat, light }` — remapeamento não-destrutivo.
-- `ProjectData { id, name, width, height, frames, animations, variations, palette, recipe?, createdAt, updatedAt }`.
+- `ProjectData { id, name, width, height, frames, animations, variations, layers, palette, recipe?, createdAt, updatedAt }`.
+- `Layer { id, name, kind: raster|group, parentId?, expanded, visible, locked, opacity, blendMode, alphaLock, clipping }` — a árvore é plana no armazenamento, com parentização validada; grupos não possuem cel raster.
 - `AssetRecipe { version, kind, seed, subtype, style, size, outline, hueShift, actions[], motion?, intensity? }` — a **receita reproduzível** de assets gerados.
 
 ### Stores (Zustand)
@@ -39,9 +40,13 @@
   overlay de formas (linha/retângulo/elipse), rampas OKLab, preview de dithering,
   máscaras de seleção + ants, espelhamento, zoom 4–32x. Geometria E3 vive em
   `src/lib/selection.ts` e cor E4 em `src/lib/colorTools.ts`.
+- Layers E5: `lib/layers.ts` normaliza projetos legados, compõe a árvore por frame com
+  opacidade/visibilidade herdadas, blend Canvas (`normal`, `multiply`, `screen`, `overlay`,
+  `add`) e clipping pela raster imediatamente abaixo; o store preserva essas operações no undo.
 - Reutilizável: `components/SpriteView.tsx` (`SpriteCanvas` estático + `AnimatedSprite` com rAF).
 - Export: `lib/exporters.ts` — spritesheet, JSON por engine (generic/phaser/godot/unity/gamemaker),
-  GIF (`gifenc`, paleta global + transparência), pack ZIP (`jszip`) com manifesto + LEIAME.
+  GIF (`gifenc`, paleta global + transparência), pack ZIP (`jszip`) com manifesto + LEIAME;
+  todos os formatos rasterizados passam pelo mesmo compositor E5.
 
 ### Motores procedurais (`src/lib/procgen/`)
 
@@ -134,7 +139,7 @@ obrigatório em `docs/BENCHMARK.md` (referência × atual × alvo por sistema).
 - [x] **FASE D2 — Bones/FK**: esqueleto-guia editável (local/pai/mundo), render pixel-snapped
 - [ ] **FASE E — Editor Core**: E1 Canvas & Workspace Engine (navegação + canvas size
   + trim + scale + flip + handles + grade; ENTREGUE) → E2 brush (ENTREGUE) → E3 seleção/transform (ENTREGUE)
-  → E4 cor (ENTREGUE) → E5 layers → E6 guias → E7 histórico
+  → E4 cor (ENTREGUE) → **E5 layers (ENTREGUE)** → E6 guias → E7 histórico
 - [ ] **FASE F — Rig+Motion**: IK two-bone + FABRIK com limites, 6 movimentos
   (idle/walk/run/jump/attack/hurt) com curvas + retargeting + edição pós-geração,
   tags por ação, modo silhueta no onion

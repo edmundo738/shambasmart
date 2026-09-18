@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import {
-  Animation, Bone, BonePose, Cell, Frame, FrameAnchor, FrameHitbox, FramePose, Layer, ORIGINAL_VARIATION_ID, PlayMode,
+  Animation, BlendMode, Bone, BonePose, Cell, Frame, FrameAnchor, FrameHitbox, FramePose, Layer, ORIGINAL_VARIATION_ID, PlayMode,
   ProjectData, SelRect, SelectionShape, ToolId, TransformMode, Variation, uid,
 } from '../types';
 import { emptyCells } from '../lib/pixels';
@@ -10,7 +10,7 @@ import {
 import { clampMs, fpsToMs, frameMs, moveIdTo } from '../lib/timeline';
 import { clampAnchor, cloneFrameMeta, normalizeHitbox, opaqueBBox } from '../lib/frameMeta';
 import { clonePose, normalizeDeg, solveFK, worldToLocal, wouldCycle } from '../lib/fk';
-import { createLayer, flattenCells, makeFrame, migrateProject } from '../lib/layers';
+import { createGroup, createLayer, flattenCells, makeFrame, migrateProject } from '../lib/layers';
 import { normalizeHex } from '../lib/color';
 import { DitherPattern, shadeColor } from '../lib/colorTools';
 import { clampZoom } from '../lib/viewport';
@@ -150,13 +150,19 @@ interface StudioState {
 
   // camadas
   selectLayer: (id: string) => void;
-  addLayer: (name?: string) => void;
+  addLayer: (name?: string, parentId?: string | null) => void;
+  addGroup: (name?: string, parentId?: string | null) => void;
   renameLayer: (id: string, name: string) => void;
   deleteLayer: (id: string) => void;
   moveLayer: (id: string, dir: -1 | 1) => void;
   toggleLayerVis: (id: string) => void;
   toggleLayerLock: (id: string) => void;
   setLayerOpacity: (id: string, opacity: number) => void;
+  setLayerBlendMode: (id: string, mode: BlendMode) => void;
+  toggleLayerAlphaLock: (id: string) => void;
+  toggleLayerClipping: (id: string) => void;
+  toggleLayerExpanded: (id: string) => void;
+  setLayerParent: (id: string, parentId: string | null) => void;
 
   // seleção + transformação pixel-safe (E3)
   selection: SelRect | null;
@@ -630,10 +636,12 @@ export const useStudio = create<StudioState>((set, get) => ({
     return { currentLayerId: id };
   }),
 
-  addLayer: (name) => set((s) => {
+  addLayer: (name, parentId) => set((s) => {
     if (!s.project) return {};
     const hist = pushHistory(s);
-    const layer = createLayer(name || `Camada ${s.project.layers.length + 1}`);
+    const selected = s.project.layers.find((l) => l.id === s.currentLayerId);
+    const parent = parentId !== undefined ? parentId : selected?.kind === 'group' ? selected.id : selected?.parentId ?? null;
+    const layer = createLayer(name || `Camada ${s.project.layers.length + 1}`, 100, parent);
     const frames: Record<string, Frame> = {};
     for (const [fid, f] of Object.entries(s.project.frames)) {
       frames[fid] = { ...f, cels: { ...f.cels, [layer.id]: emptyCells(s.project!.width, s.project!.height) } };
@@ -642,6 +650,19 @@ export const useStudio = create<StudioState>((set, get) => ({
       ...hist,
       project: { ...s.project, layers: [...s.project.layers, layer], frames, updatedAt: Date.now() },
       currentLayerId: layer.id,
+    };
+  }),
+
+  addGroup: (name, parentId) => set((s) => {
+    if (!s.project) return {};
+    const hist = pushHistory(s);
+    const selected = s.project.layers.find((l) => l.id === s.currentLayerId);
+    const parent = parentId !== undefined ? parentId : selected?.kind === 'group' ? selected.id : selected?.parentId ?? null;
+    const group = createGroup(name || `Grupo ${s.project.layers.length + 1}`, 100, parent);
+    return {
+      ...hist,
+      project: { ...s.project, layers: [...s.project.layers, group], updatedAt: Date.now() },
+      currentLayerId: group.id,
     };
   }),
 
@@ -662,36 +683,49 @@ export const useStudio = create<StudioState>((set, get) => ({
   deleteLayer: (id) => set((s) => {
     if (!s.project || s.project.layers.length <= 1) return {};
     if (!s.project.layers.some((l) => l.id === id)) return {};
+    const removed = new Set<string>([id]);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const l of s.project.layers) if (l.parentId && removed.has(l.parentId) && !removed.has(l.id)) { removed.add(l.id); changed = true; }
+    }
+    const layers = s.project.layers.filter((l) => !removed.has(l.id));
+    if (!layers.length) return {};
     const hist = pushHistory(s);
-    const layers = s.project.layers.filter((l) => l.id !== id);
     const frames: Record<string, Frame> = {};
     for (const [fid, f] of Object.entries(s.project.frames)) {
       const cels = { ...f.cels };
-      delete cels[id];
+      for (const rid of removed) delete cels[rid];
       frames[fid] = { ...f, cels };
     }
+    const nextLayer = layers[layers.length - 1];
     return {
       ...hist,
       project: { ...s.project, layers, frames, updatedAt: Date.now() },
-      currentLayerId: s.currentLayerId === id ? layers[layers.length - 1].id : s.currentLayerId,
+      currentLayerId: s.currentLayerId && removed.has(s.currentLayerId) ? nextLayer?.id ?? null : s.currentLayerId,
     };
   }),
 
   moveLayer: (id, dir) => set((s) => {
     if (!s.project) return {};
-    const i = s.project.layers.findIndex((l) => l.id === id);
-    const j = i + dir;
-    if (i < 0 || j < 0 || j >= s.project.layers.length) return {};
+    const layer = s.project.layers.find((l) => l.id === id);
+    if (!layer) return {};
+    const siblings = s.project.layers.map((l, i) => ({ l, i })).filter(({ l }) => l.parentId === layer.parentId);
+    const pos = siblings.findIndex(({ l }) => l.id === id);
+    const target = pos + dir;
+    if (pos < 0 || target < 0 || target >= siblings.length) return {};
     const hist = pushHistory(s);
     const layers = [...s.project.layers];
-    [layers[i], layers[j]] = [layers[j], layers[i]];
+    const a = siblings[pos].i, b = siblings[target].i;
+    [layers[a], layers[b]] = [layers[b], layers[a]];
     return { ...hist, project: { ...s.project, layers, updatedAt: Date.now() } };
   }),
 
-  // visibilidade, lock e opacidade são estado de vista (como grade/onion): sem undo
   toggleLayerVis: (id) => set((s) => {
-    if (!s.project) return {};
+    if (!s.project || !s.project.layers.some((l) => l.id === id)) return {};
+    const hist = pushHistory(s);
     return {
+      ...hist,
       project: {
         ...s.project,
         layers: s.project.layers.map((l) => (l.id === id ? { ...l, visible: !l.visible } : l)),
@@ -702,8 +736,10 @@ export const useStudio = create<StudioState>((set, get) => ({
   }),
 
   toggleLayerLock: (id) => set((s) => {
-    if (!s.project) return {};
+    if (!s.project || !s.project.layers.some((l) => l.id === id)) return {};
+    const hist = pushHistory(s);
     return {
+      ...hist,
       project: {
         ...s.project,
         layers: s.project.layers.map((l) => (l.id === id ? { ...l, locked: !l.locked } : l)),
@@ -715,14 +751,66 @@ export const useStudio = create<StudioState>((set, get) => ({
 
   setLayerOpacity: (id, opacity) => set((s) => {
     if (!s.project) return {};
+    const next = Math.max(0, Math.min(100, Math.round(opacity)));
+    const layer = s.project.layers.find((l) => l.id === id);
+    if (!layer || layer.opacity === next) return {};
+    const hist = pushHistory(s);
     return {
+      ...hist,
       project: {
         ...s.project,
-        layers: s.project.layers.map((l) => (l.id === id ? { ...l, opacity: Math.max(0, Math.min(100, Math.round(opacity))) } : l)),
+        layers: s.project.layers.map((l) => (l.id === id ? { ...l, opacity: next } : l)),
         updatedAt: Date.now(),
       },
       dirty: true,
     };
+  }),
+
+  setLayerBlendMode: (id, blendMode) => set((s) => {
+    if (!s.project) return {};
+    const layer = s.project.layers.find((l) => l.id === id);
+    if (!layer || layer.blendMode === blendMode) return {};
+    const hist = pushHistory(s);
+    return { ...hist, project: { ...s.project, layers: s.project.layers.map((l) => l.id === id ? { ...l, blendMode } : l), updatedAt: Date.now() } };
+  }),
+
+  toggleLayerAlphaLock: (id) => set((s) => {
+    if (!s.project) return {};
+    const layer = s.project.layers.find((l) => l.id === id);
+    if (!layer || layer.kind === 'group') return {};
+    const hist = pushHistory(s);
+    return { ...hist, project: { ...s.project, layers: s.project.layers.map((l) => l.id === id ? { ...l, alphaLock: !l.alphaLock } : l), updatedAt: Date.now() } };
+  }),
+
+  toggleLayerClipping: (id) => set((s) => {
+    if (!s.project) return {};
+    const layer = s.project.layers.find((l) => l.id === id);
+    if (!layer || layer.kind === 'group') return {};
+    const hist = pushHistory(s);
+    return { ...hist, project: { ...s.project, layers: s.project.layers.map((l) => l.id === id ? { ...l, clipping: !l.clipping } : l), updatedAt: Date.now() } };
+  }),
+
+  toggleLayerExpanded: (id) => set((s) => {
+    if (!s.project) return {};
+    const layer = s.project.layers.find((l) => l.id === id);
+    if (!layer || layer.kind !== 'group') return {};
+    return { project: { ...s.project, layers: s.project.layers.map((l) => l.id === id ? { ...l, expanded: !l.expanded } : l), updatedAt: Date.now() }, dirty: true };
+  }),
+
+  setLayerParent: (id, parentId) => set((s) => {
+    if (!s.project || id === parentId) return {};
+    const layer = s.project.layers.find((l) => l.id === id);
+    const parent = parentId ? s.project.layers.find((l) => l.id === parentId) : undefined;
+    if (!layer || (parentId && (!parent || parent.kind !== 'group'))) return {};
+    const descendants = new Set<string>();
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const l of s.project.layers) if (l.parentId && (l.parentId === id || descendants.has(l.parentId)) && !descendants.has(l.id)) { descendants.add(l.id); changed = true; }
+    }
+    if (parentId && descendants.has(parentId)) return {};
+    const hist = pushHistory(s);
+    return { ...hist, project: { ...s.project, layers: s.project.layers.map((l) => l.id === id ? { ...l, parentId } : l), updatedAt: Date.now() } };
   }),
 
   setSelection: (selection) => set((s) => ({
@@ -742,6 +830,7 @@ export const useStudio = create<StudioState>((set, get) => ({
   selectObjectAt: (x, y) => set((s) => {
     if (!s.project || !s.currentFrameId) return {};
     const layer = currentLayer(s.project, s.currentLayerId);
+    if (layer.kind === 'group') return {};
     const frame = s.project.frames[s.currentFrameId];
     if (!frame) return {};
     const cel = frame.cels[layer.id] ?? emptyCells(s.project.width, s.project.height);
@@ -752,21 +841,21 @@ export const useStudio = create<StudioState>((set, get) => ({
   moveSelection: (dx, dy) => set((s) => {
     if (!s.project || !s.selection || (!dx && !dy)) return {};
     const layer = currentLayer(s.project, s.currentLayerId);
-    if (layer.locked) return {};
+    if (layer.locked || layer.kind === 'group') return {};
     return applyMove(s, s.project, s.selection, pushHistory(s), dx, dy);
   }),
 
   moveSelectionLive: (dx, dy) => set((s) => {
     if (!s.project || !s.selection || (!dx && !dy)) return {};
     const layer = currentLayer(s.project, s.currentLayerId);
-    if (layer.locked) return {};
+    if (layer.locked || layer.kind === 'group') return {};
     return applyMove(s, s.project, s.selection, {}, dx, dy);
   }),
 
   deleteSelection: () => set((s) => {
     if (!s.project || !s.selection) return {};
     const layer = currentLayer(s.project, s.currentLayerId);
-    if (layer.locked) return {};
+    if (layer.locked || layer.kind === 'group') return {};
     const hist = pushHistory(s);
     const { width: w, height: h } = s.project;
     const mask = s.selectionMask ?? rectMask(w, h, s.selection);
@@ -788,7 +877,7 @@ export const useStudio = create<StudioState>((set, get) => ({
   rotateSelection: (clockwise) => set((s) => {
     if (!s.project || !s.selection) return {};
     const layer = currentLayer(s.project, s.currentLayerId);
-    if (layer.locked) return {};
+    if (layer.locked || layer.kind === 'group') return {};
     const frame = s.project.frames[s.currentFrameId ?? ''];
     if (!frame) return {};
     const mask = s.selectionMask ?? rectMask(s.project.width, s.project.height, s.selection);
@@ -804,7 +893,7 @@ export const useStudio = create<StudioState>((set, get) => ({
   scaleSelection: (factor) => set((s) => {
     if (!s.project || !s.selection || !Number.isFinite(factor) || factor <= 0) return {};
     const layer = currentLayer(s.project, s.currentLayerId);
-    if (layer.locked) return {};
+    if (layer.locked || layer.kind === 'group') return {};
     const frame = s.project.frames[s.currentFrameId ?? ''];
     if (!frame) return {};
     const mask = s.selectionMask ?? rectMask(s.project.width, s.project.height, s.selection);
@@ -829,12 +918,17 @@ export const useStudio = create<StudioState>((set, get) => ({
   paint: (indices, color) => set((s) => {
     if (!s.project || !s.currentFrameId) return {};
     const layer = currentLayer(s.project, s.currentLayerId);
-    if (layer.locked) return {};
+    if (layer.locked || layer.kind === 'group') return {};
     const frame = s.project.frames[s.currentFrameId];
     if (!frame) return {};
     const cells = [...(frame.cels[layer.id] ?? emptyCells(s.project.width, s.project.height))];
     const value = color === null ? '' : normalizeHex(color);
-    for (const i of indices) cells[i] = value;
+    let changed = false;
+    for (const i of indices) {
+      if (i < 0 || i >= cells.length || (layer.alphaLock && !cells[i])) continue;
+      if (cells[i] !== value) { cells[i] = value; changed = true; }
+    }
+    if (!changed) return {};
     return {
       project: {
         ...s.project,
@@ -848,11 +942,17 @@ export const useStudio = create<StudioState>((set, get) => ({
   paintPatch: (patches) => set((s) => {
     if (!s.project || !s.currentFrameId || !patches.length) return {};
     const layer = currentLayer(s.project, s.currentLayerId);
-    if (layer.locked) return {};
+    if (layer.locked || layer.kind === 'group') return {};
     const frame = s.project.frames[s.currentFrameId];
     if (!frame) return {};
     const cells = [...(frame.cels[layer.id] ?? emptyCells(s.project.width, s.project.height))];
-    for (const [i, c] of patches) cells[i] = c ? normalizeHex(c) : '';
+    let changed = false;
+    for (const [i, c] of patches) {
+      if (i < 0 || i >= cells.length || (layer.alphaLock && !cells[i])) continue;
+      const next = c ? normalizeHex(c) : '';
+      if (cells[i] !== next) { cells[i] = next; changed = true; }
+    }
+    if (!changed) return {};
     return {
       project: {
         ...s.project,
@@ -865,7 +965,15 @@ export const useStudio = create<StudioState>((set, get) => ({
 
   drawShape: (indices, color) => {
     const s = get();
-    if (!s.project) return;
+    if (!s.project || !s.currentFrameId) return;
+    const layer = currentLayer(s.project, s.currentLayerId);
+    if (layer.locked || layer.kind === 'group') return;
+    const frame = s.project.frames[s.currentFrameId];
+    if (!frame) return;
+    const cells = frame.cels[layer.id] ?? emptyCells(s.project.width, s.project.height);
+    const value = color === null ? '' : normalizeHex(color);
+    const canChange = indices.some((i) => i >= 0 && i < cells.length && (!layer.alphaLock || !!cells[i]) && cells[i] !== value);
+    if (!canChange) return;
     set(pushHistory(s));
     get().paint(indices, color);
   },
@@ -1301,7 +1409,7 @@ export const useStudio = create<StudioState>((set, get) => ({
   clearFrame: (id) => set((s) => {
     if (!s.project || !s.project.frames[id]) return {};
     const layer = currentLayer(s.project, s.currentLayerId);
-    if (layer.locked) return {};
+    if (layer.locked || layer.kind === 'group') return {};
     const hist = pushHistory(s);
     const frame = s.project.frames[id];
     const cels = { ...frame.cels, [layer.id]: emptyCells(s.project.width, s.project.height) };
@@ -1389,9 +1497,9 @@ export const useStudio = create<StudioState>((set, get) => ({
     if (!s.project || !framesCells.length) return {};
     const hist = pushHistory(s);
     const frames = { ...s.project.frames };
-    const target = s.project.layers.find((l) => l.id === s.currentLayerId && !l.locked)
-      ?? s.project.layers.find((l) => !l.locked)
-      ?? s.project.layers[0];
+    const target = s.project.layers.find((l) => l.id === s.currentLayerId && l.kind === 'raster' && !l.locked)
+      ?? s.project.layers.find((l) => l.kind === 'raster' && !l.locked)
+      ?? s.project.layers.find((l) => l.kind === 'raster');
     const frameIds = framesCells.map((cells) => {
       const cels = emptyCels(s.project!);
       if (target) cels[target.id] = [...cells];
@@ -1543,7 +1651,7 @@ export const useStudio = create<StudioState>((set, get) => ({
   shadeSelection: (amount) => set((s) => {
     if (!s.project || !s.selection || !Number.isFinite(amount) || !amount) return {};
     const layer = currentLayer(s.project, s.currentLayerId);
-    if (layer.locked) return {};
+    if (layer.locked || layer.kind === 'group') return {};
     const frame = s.project.frames[s.currentFrameId ?? ''];
     if (!frame) return {};
     const mask = s.selectionMask ?? rectMask(s.project.width, s.project.height, s.selection);

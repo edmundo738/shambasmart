@@ -5,7 +5,7 @@ import {
   Variation,
 } from '../types';
 import { applyVariationToColor } from './color';
-import { compositeStack } from './layers';
+import { canvasBlendMode, compositeStack } from './layers';
 import { clampMs, durationsOf, fpsToMs, playbackOrder } from './timeline';
 
 /* ------------------------------- render base ------------------------------ */
@@ -41,7 +41,7 @@ export function renderCellsToCanvas(
 
 /** Compõe uma pilha pré-computada (cells + opacidade por camada). */
 export function renderStackToCanvas(
-  stack: Array<{ cells: string[]; opacity: number }>,
+  stack: Array<{ cells: string[]; opacity: number; blendMode?: import('../types').BlendMode; clipping?: boolean }>,
   w: number, h: number, opts: RenderOpts = {},
 ): HTMLCanvasElement {
   const { scale = 1, variation = null, background = '' } = opts;
@@ -53,19 +53,29 @@ export function renderStackToCanvas(
     ctx.fillStyle = background;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
-  for (const { cells, opacity } of stack) {
-    if (opacity <= 0) continue;
+  let previousCells: string[] | null = null;
+  for (const { cells, opacity, blendMode = 'normal', clipping = false } of stack) {
+    const visibleCells = clipping && previousCells
+      ? cells.map((c, i) => c && previousCells?.[i] ? c : '')
+      : cells;
+    if (opacity <= 0) {
+      previousCells = cells;
+      continue;
+    }
+    ctx.globalCompositeOperation = canvasBlendMode(blendMode);
     ctx.globalAlpha = Math.max(0, Math.min(1, opacity / 100));
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
-        const c = applyVariationToColor(cells[y * w + x] ?? '', variation);
+        const c = applyVariationToColor(visibleCells[y * w + x] ?? '', variation);
         if (!c) continue;
         ctx.fillStyle = c;
         ctx.fillRect(x * scale, y * scale, scale, scale);
       }
     }
+    previousCells = cells;
   }
   ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
   return canvas;
 }
 
@@ -73,7 +83,7 @@ export function renderStackToCanvas(
 export function renderFrameToCanvas(
   project: ProjectData, frame: Frame, opts: RenderOpts = {},
 ): HTMLCanvasElement {
-  const stack = compositeStack(project, frame).map(({ layer, cells }) => ({ cells, opacity: layer.opacity }));
+  const stack = compositeStack(project, frame).map(({ cells, opacity, blendMode, clipping }) => ({ cells, opacity, blendMode, clipping }));
   return renderStackToCanvas(stack, project.width, project.height, opts);
 }
 
@@ -316,7 +326,7 @@ export async function buildPackZip(project: ProjectData, opts: PackOpts): Promis
             opts.engine, `${base}.png`, canvas.width, canvas.height,
             project.width * opts.scale, project.height * opts.scale,
             frameNames, rects, anim.fps,
-            project.layers.map((l) => ({ name: l.name, visible: l.visible, opacity: l.opacity })),
+            project.layers.map((l) => ({ name: l.name, kind: l.kind, parentId: l.parentId, visible: l.visible, opacity: l.opacity, blendMode: l.blendMode, alphaLock: l.alphaLock, clipping: l.clipping })),
             durationsOf(anim, project.frames),
             anim.playMode ?? 'loop',
             frames.map((f) => ({ anchors: f.anchors ?? [], hitbox: f.hitbox ?? null })),

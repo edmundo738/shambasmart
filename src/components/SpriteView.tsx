@@ -1,11 +1,13 @@
 import { useEffect, useRef } from 'react';
-import { MIN_FRAME_MS, PlayMode, Variation } from '../types';
+import { BlendMode, MIN_FRAME_MS, PlayMode, Variation } from '../types';
 import { playbackOrder } from '../lib/timeline';
 import { RenderOpts, renderCellsToCanvas, renderStackToCanvas } from '../lib/exporters';
 
 export interface LayerStackItem {
   cells: string[];
   opacity: number;
+  blendMode?: BlendMode;
+  clipping?: boolean;
 }
 
 /** Item de frame: pixels chapados OU pilha de layers (composta com alpha). */

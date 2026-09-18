@@ -55,13 +55,17 @@ Legenda de status: ✅ sólido · 🟡 funcional mas amador · 🔴 ausente/frá
 - **TARGET:** tolerância do balde fica de fora (pixel art = contíguo exato);
   polígono/laço/varinha (→ E3).
 
-## LAYERS 🟡 (B1 entregue; avançado → E5)
+## LAYERS 🟢 (E5 entregue — árvore, blend, alpha lock, clipping)
 
 - **REFERENCE (Aseprite):** unidade de trabalho = frame × layer = cel; visibilidade,
   lock, opacidade, nome, ordem, grupos, layers de referência; blend/clipping.
-- **CURRENT (B1 entregue):** modelo `frame × layer = cel` com vis/lock/opacity/nome/
-  ordem + migração automática. Sem grupos/blend/alpha-lock/clipping.
-- **TARGET:** grupos + blend + alpha lock + clipping (→ FASE E5).
+- **CURRENT (E5):** `frame × layer = cel` com árvore raster/grupo; grupos acumulam
+  visibilidade/opacidade; ordem entre irmãos; Normal/Multiply/Screen/Overlay/Add renderizados
+  pelo Canvas 2D e export; alpha lock bloqueia pixels transparentes; clipping limita uma
+  layer à alfa da raster abaixo; painel permite criar grupo, aninhar, recolher, renomear,
+  reordenar, ocultar, travar e editar blend/opacidade.
+- **TARGET:** layers de referência e máscaras alfa independentes; ficam depois de E6 sem
+  fingir que um botão de “referência” já renderiza dados.
 
 ## TIMELINE 🟢 (C1 entregue; tags → F)
 

@@ -1,4 +1,4 @@
-import { Bone, DEFAULT_FRAME_MS, Frame, FrameAnchor, FrameHitbox, Layer, PlayMode, ProjectData, uid } from '../types';
+import { BlendMode, Bone, DEFAULT_FRAME_MS, Frame, FrameAnchor, FrameHitbox, Layer, LayerKind, PlayMode, ProjectData, uid } from '../types';
 import { clampMs, fpsToMs } from './timeline';
 import { clampAnchor, normalizeHitbox } from './frameMeta';
 import { emptyCells } from './pixels';
@@ -8,8 +8,18 @@ import { emptyCells } from './pixels';
  * Composição é fundo→topo; render aplica opacidade por camada no canvas.
  */
 
-export function createLayer(name: string, opacity = 100): Layer {
-  return { id: uid('ly'), name, visible: true, locked: false, opacity };
+export function createLayer(name: string, opacity = 100, parentId: string | null = null): Layer {
+  return {
+    id: uid('ly'), name, kind: 'raster', parentId, expanded: true,
+    visible: true, locked: false, alphaLock: false, clipping: false, blendMode: 'normal', opacity,
+  };
+}
+
+export function createGroup(name: string, opacity = 100, parentId: string | null = null): Layer {
+  return {
+    id: uid('ly'), name, kind: 'group', parentId, expanded: true,
+    visible: true, locked: false, alphaLock: false, clipping: false, blendMode: 'normal', opacity,
+  };
 }
 
 export function makeFrame(layerId: string, cells: string[], durationMs = DEFAULT_FRAME_MS): Frame {
@@ -25,6 +35,7 @@ export function ensureFrameCels(project: ProjectData, frame: Frame): Frame {
   let changed = false;
   const cels = { ...frame.cels };
   for (const l of project.layers) {
+    if (l.kind === 'group') continue;
     if (!cels[l.id]) {
       cels[l.id] = emptyCells(project.width, project.height);
       changed = true;
@@ -33,33 +44,95 @@ export function ensureFrameCels(project: ProjectData, frame: Frame): Frame {
   return changed ? { ...frame, cels } : frame;
 }
 
-/** Pilha de composição: só visíveis, fundo→topo. */
-export function compositeStack(
-  project: ProjectData, frame: Frame,
-): Array<{ layer: Layer; cells: string[] }> {
+/** Blend modes do modelo para Canvas 2D. `add` é o nome pixel-art, Canvas chama-lhe lighter. */
+export function canvasBlendMode(mode: BlendMode): GlobalCompositeOperation {
+  if (mode === 'add') return 'lighter';
+  if (mode === 'multiply' || mode === 'screen' || mode === 'overlay') return mode;
+  return 'source-over';
+}
+
+export interface CompositeLayer {
+  layer: Layer;
+  cells: string[];
+  opacity: number;
+  blendMode: BlendMode;
+  clipping: boolean;
+}
+
+/**
+ * Pilha de composição: árvore de grupos achatada fundo→topo. Grupos acumulam
+ * visibilidade/opacidade; clipping usa a máscara alfa da raster imediatamente
+ * abaixo. O array continua compacto para os viewers antigos.
+ */
+export function compositeStack(project: ProjectData, frame: Frame): CompositeLayer[] {
   return stackFromLayers(project.layers, frame);
 }
 
-export function stackFromLayers(
-  layers: Layer[], frame: Frame,
-): Array<{ layer: Layer; cells: string[] }> {
-  const out: Array<{ layer: Layer; cells: string[] }> = [];
+export function stackFromLayers(layers: Layer[], frame: Frame): CompositeLayer[] {
+  // A composição também é defensiva contra JSON externo malformado: parent só
+  // aponta para grupo existente e ciclos são quebrados no elo que os fecharia.
+  const byId = new Map(layers.map((layer) => [layer.id, layer]));
+  const parentOf = new Map<string, string | null>();
   for (const layer of layers) {
-    if (!layer.visible) continue;
-    out.push({ layer, cells: frame.cels[layer.id] ?? [] });
+    const parent = byId.get(layer.parentId ?? '')?.kind === 'group' && layer.parentId !== layer.id
+      ? layer.parentId : null;
+    parentOf.set(layer.id, parent);
   }
+  for (const layer of layers) {
+    const seen = new Set<string>([layer.id]);
+    let parent = parentOf.get(layer.id) ?? null;
+    while (parent) {
+      if (seen.has(parent)) {
+        parentOf.set(layer.id, null);
+        break;
+      }
+      seen.add(parent);
+      parent = parentOf.get(parent) ?? null;
+    }
+  }
+  const byParent = new Map<string | null, Layer[]>();
+  for (const layer of layers) {
+    const parent = parentOf.get(layer.id) ?? null;
+    const list = byParent.get(parent) ?? [];
+    list.push(layer);
+    byParent.set(parent, list);
+  }
+  const out: CompositeLayer[] = [];
+  const visit = (parentId: string | null, parentVisible: boolean, parentOpacity: number, parentBlend: BlendMode) => {
+    for (const layer of byParent.get(parentId) ?? []) {
+      const visible = parentVisible && layer.visible;
+      if (!visible) continue;
+      const opacity = parentOpacity * Math.max(0, Math.min(1, layer.opacity / 100));
+      const blendMode = layer.blendMode !== 'normal' ? layer.blendMode : parentBlend;
+      if (layer.kind === 'group') {
+        visit(layer.id, visible, opacity, blendMode);
+        continue;
+      }
+      const raw = frame.cels[layer.id] ?? [];
+      const previous = out[out.length - 1];
+      const cells = layer.clipping && previous
+        ? raw.map((c, i) => c && previous.cells[i] ? c : '')
+        : raw;
+      out.push({ layer, cells, opacity: opacity * 100, blendMode, clipping: layer.clipping });
+    }
+  };
+  visit(null, true, 1, 'normal');
   return out;
 }
 
-/** Pilha pronta para render (cells + opacidade), sem metadados. */
-export function celStack(layers: Layer[], frame: Frame): Array<{ cells: string[]; opacity: number }> {
-  return stackFromLayers(layers, frame).map(({ layer, cells }) => ({ cells, opacity: layer.opacity }));
+/** Pilha pronta para render (cells + opacidade + blend), compatível com SpriteView. */
+export function celStack(layers: Layer[], frame: Frame): Array<{ cells: string[]; opacity: number; blendMode?: BlendMode; clipping?: boolean }> {
+  return stackFromLayers(layers, frame).map(({ cells, opacity, blendMode, clipping }) => ({
+    cells, opacity,
+    ...(blendMode !== 'normal' ? { blendMode } : {}),
+    ...(clipping ? { clipping } : {}),
+  }));
 }
 
 /** Item de frame para os viewers (SpriteCanvas/AnimatedSprite). */
 export function frameItem(
   layers: Layer[], frame: Frame,
-): { id: string; layers: Array<{ cells: string[]; opacity: number }> } {
+): { id: string; layers: Array<{ cells: string[]; opacity: number; blendMode?: BlendMode; clipping?: boolean }> } {
   return { id: frame.id, layers: celStack(layers, frame) };
 }
 
@@ -78,9 +151,50 @@ export function flattenCells(project: ProjectData, frame: Frame): string[] {
   return out;
 }
 
+function normalizeLayer(raw: Partial<Layer>, index: number): Layer {
+  const kind: LayerKind = raw.kind === 'group' ? 'group' : 'raster';
+  const blendMode: BlendMode = raw.blendMode === 'multiply' || raw.blendMode === 'screen' || raw.blendMode === 'overlay' || raw.blendMode === 'add' ? raw.blendMode : 'normal';
+  return {
+    id: typeof raw.id === 'string' && raw.id ? raw.id : uid('ly'),
+    name: typeof raw.name === 'string' && raw.name ? raw.name.slice(0, 32) : `Camada ${index + 1}`,
+    kind,
+    parentId: typeof raw.parentId === 'string' ? raw.parentId : null,
+    expanded: raw.expanded !== false,
+    visible: raw.visible !== false,
+    locked: raw.locked === true,
+    alphaLock: raw.alphaLock === true,
+    clipping: raw.clipping === true && kind === 'raster',
+    blendMode,
+    opacity: typeof raw.opacity === 'number' && Number.isFinite(raw.opacity) ? Math.max(0, Math.min(100, Math.round(raw.opacity))) : 100,
+  };
+}
+
+function normalizeLayers(raw: Layer[]): Layer[] {
+  const layers = raw.map((layer, index) => normalizeLayer(layer, index));
+  const byId = new Map(layers.map((layer) => [layer.id, layer]));
+  const parentOf = new Map<string, string | null>();
+  for (const layer of layers) {
+    parentOf.set(layer.id, byId.get(layer.parentId ?? '')?.kind === 'group' && layer.parentId !== layer.id
+      ? layer.parentId : null);
+  }
+  for (const layer of layers) {
+    const seen = new Set<string>([layer.id]);
+    let parent = parentOf.get(layer.id) ?? null;
+    while (parent) {
+      if (seen.has(parent)) {
+        parentOf.set(layer.id, null);
+        break;
+      }
+      seen.add(parent);
+      parent = parentOf.get(parent) ?? null;
+    }
+  }
+  return layers.map((layer) => ({ ...layer, parentId: parentOf.get(layer.id) ?? null }));
+}
+
 /**
  * Migração idempotente: projetos antigos (1 camada chapada em `cells`) ganham
- * `layers: [Camada 1]` + `cels`. Projetos novos passam intactos.
+ * `layers: [Camada 1]` + `cels`; layers B1 ganham defaults de grupo/blend/alpha-lock.
  */
 export function migrateProject(p: ProjectData): ProjectData {
   const raw = p as unknown as {
@@ -151,21 +265,24 @@ export function migrateProject(p: ProjectData): ProjectData {
     rigChanged = true;
   }
   if (raw.layers && raw.layers.length > 0) {
-    let changed = false;
+    const layers = normalizeLayers(raw.layers);
+    const firstRasterId = layers.find((layer) => layer.kind === 'raster')?.id ?? layers[0].id;
+    const layersChanged = JSON.stringify(layers) !== JSON.stringify(raw.layers);
+    let changed = layersChanged;
     const frames: Record<string, Frame> = {};
     for (const [id, f] of Object.entries(raw.frames)) {
       if (f.cels) {
         const meta = legacyMeta(f);
-        const ensured = ensureFrameCels({ ...p, layers: raw.layers }, { id, cels: f.cels, durationMs: legacyMs(id, f.durationMs), ...meta });
+        const ensured = ensureFrameCels({ ...p, layers }, { id, cels: f.cels, durationMs: legacyMs(id, f.durationMs), ...meta });
         frames[id] = ensured;
         if (ensured.cels !== f.cels || f.durationMs === undefined || metaDirty(f, meta)) changed = true;
       } else {
-        frames[id] = { id, cels: { [raw.layers[0].id]: f.cells ?? emptyCells(p.width, p.height) }, durationMs: legacyMs(id, f.durationMs), ...legacyMeta(f) };
+        frames[id] = { id, cels: { [firstRasterId]: f.cells ?? emptyCells(p.width, p.height) }, durationMs: legacyMs(id, f.durationMs), ...legacyMeta(f) };
         changed = true;
       }
     }
     if (!changed && !animsChanged && !rigChanged) return p;
-    return { ...p, frames, animations, rig };
+    return { ...p, layers, frames, animations, rig };
   }
   const layer = createLayer('Camada 1');
   const frames: Record<string, Frame> = {};

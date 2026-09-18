@@ -1,11 +1,23 @@
 /** Célula: "" = transparente, ou cor hexadecimal "#rrggbb" */
 export type Cell = string;
 
+export type LayerKind = 'raster' | 'group';
+export type BlendMode = 'normal' | 'multiply' | 'screen' | 'overlay' | 'add';
+
 export interface Layer {
   id: string;
   name: string;
+  kind: LayerKind;
+  /** Ordem visual: parentId aponta para uma layer kind=group; null = raiz. */
+  parentId: string | null;
+  /** Grupo aberto no painel (não altera a renderização). */
+  expanded: boolean;
   visible: boolean;
   locked: boolean;
+  alphaLock: boolean;
+  /** Clipping: máscara pela layer raster imediatamente abaixo. */
+  clipping: boolean;
+  blendMode: BlendMode;
   /** 0..100 */
   opacity: number;
 }
