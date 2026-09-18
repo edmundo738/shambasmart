@@ -108,16 +108,28 @@ function ProjectRow({ meta }: { meta: ProjectMeta }) {
   );
 }
 
+const CREATE_PRESETS = [
+  { label: 'Ícone', w: 16, h: 16 },
+  { label: 'Item', w: 32, h: 32 },
+  { label: 'Criatura', w: 48, h: 48 },
+  { label: 'Herói', w: 64, h: 64 },
+  { label: 'Personagem', w: 64, h: 96 },
+  { label: 'Retrato', w: 96, h: 96 },
+  { label: 'Arma', w: 96, h: 48 },
+  { label: 'Chefe', w: 128, h: 128 },
+];
+
 export default function Projects() {
   const metas = useProjects((s) => s.metas);
   const user = useAuth((s) => s.user);
   const navigate = useNavigate();
   const [authOpen, setAuthOpen] = useState(false);
   const [name, setName] = useState('');
-  const [size, setSize] = useState(32);
+  const [preset, setPreset] = useState(1);
 
   const createBlank = () => {
-    navigate(`/studio?name=${encodeURIComponent(name.trim() || 'Meu sprite')}&w=${size}&h=${size}`);
+    const p = CREATE_PRESETS[preset];
+    navigate(`/studio?name=${encodeURIComponent(name.trim() || 'Meu sprite')}&w=${p.w}&h=${p.h}`);
   };
 
   return (
@@ -177,15 +189,16 @@ export default function Projects() {
               />
             </label>
             <div className="text-xs text-slate-400">
-              <span className="mb-1 block">Tamanho do canvas</span>
-              <div className="flex gap-1">
-                {[16, 24, 32, 48, 64].map((s) => (
+              <span className="mb-1 block">Tamanho inicial</span>
+              <div className="flex max-w-md flex-wrap gap-1">
+                {CREATE_PRESETS.map((p, i) => (
                   <button
-                    key={s}
-                    onClick={() => setSize(s)}
-                    className={`pixel-corners-sm px-3 py-2.5 font-mono text-xs font-bold ${size === s ? 'bg-forge-500/20 text-forge-300 ring-1 ring-forge-500' : 'bg-ink-950 text-slate-400 hover:text-white'}`}
+                    key={p.label}
+                    onClick={() => setPreset(i)}
+                    title={`${p.w}×${p.h}px`}
+                    className={`pixel-corners-sm px-2.5 py-2 font-mono text-[11px] font-bold ${preset === i ? 'bg-forge-500/20 text-forge-300 ring-1 ring-forge-500' : 'bg-ink-950 text-slate-400 hover:text-white'}`}
                   >
-                    {s}²
+                    {p.label} <span className="opacity-60">{p.w}×{p.h}</span>
                   </button>
                 ))}
               </div>

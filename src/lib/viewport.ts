@@ -67,3 +67,17 @@ export function keepAnchor(frac: number, viewSize: number, newContent: number, c
 export function centerScroll(viewSize: number, content: number): number {
   return Math.max(0, (content - viewSize) / 2);
 }
+
+/**
+ * Cadeia viewport->célula (pura): scroll + offset na viewport -> célula ou null.
+ * O componente mede o retângulo; a matemática mora aqui.
+ */
+export function cellFromView(
+  scroll: number, viewOffset: number, contentSize: number, docSize: number,
+): number | null {
+  if (!Number.isFinite(scroll) || !Number.isFinite(viewOffset)) return null;
+  if (contentSize <= 0 || docSize <= 0) return null;
+  const cell = Math.floor(((scroll + viewOffset) / contentSize) * docSize);
+  if (cell < 0 || cell >= docSize) return null;
+  return cell;
+}

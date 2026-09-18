@@ -11,15 +11,19 @@ Legenda de status: ✅ sólido · 🟡 funcional mas amador · 🔴 ausente/frá
 
 ---
 
-## CANVAS 🟢 (E1 entregue)
+## CANVAS 🟢 (E1+ entregue: navegação + canvas size)
 
-- **REFERENCE (Aseprite/Pixelorama):** Ctrl+wheel com zoom-no-cursor, pan (mão/meio),
-  fit, 100%/200%, HUD mínima; zoom inteiro = pixel-crisp.
-- **CURRENT (E1 entregue):** escada 1–64 + Ctrl+wheel ancorado no cursor + pan
-  (H segurado/botão-do-meio/arrastar fundo) + F fit + 1/2 + pill com % + HUD
-  (tamanho/zoom/frame/layer/tool/PP) + auto-fit ao abrir projeto.
-- **TARGET:** rotação de canvas e workspace infinito ficam DE FORA (irrelevantes
-  p/ pixel art; nenhum pixel editor tem).
+- **REFERENCE (Aseprite Canvas Size/Sprite Size/Trim):** redimensionar com âncora,
+  cortar no conteúdo, dimensionar nearest, espelhar — tudo com undo.
+- **CURRENT (E1+ entregue):** navegação (escada 1–64, Ctrl+wheel ancorado, pan
+  H/meio/fundo, F fit, 1/2, HUD, auto-fit) + diálogo de canvas (`C` ou clique no
+  tamanho no HUD): W/H + presets + âncora numpad 1–9 + aviso de corte em px +
+  trim-to-content com padding + scale nearest + flip H/V (pixels + âncoras +
+  hitbox + rig com re-solve FK de mundo preservado + seleção, undo único) +
+  handles visuais de resize (8 bordas/cantos, Esc sai) + grade menor/maior
+  configurável (1/2/4/8) + presets de criação (Ícone→Chefe, incl. 64×96).
+- **TARGET:** rotação de canvas e bitmap infinito ficam DE FORA; navegação =
+  content-bounded (como Aseprite); guias arrastáveis → E6.
 
 ## DRAWING (desenho livre) 🟢 (A entregue; restos → E2)
 

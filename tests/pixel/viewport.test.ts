@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { anchorFrac, centerScroll, clampZoom, fitZoom, keepAnchor, stepZoom, ZOOM_LADDER } from '../../src/lib/viewport';
+import { anchorFrac, cellFromView, centerScroll, clampZoom, fitZoom, keepAnchor, stepZoom, ZOOM_LADDER } from '../../src/lib/viewport';
 
 describe('clampZoom', () => {
   it('arredonda e prende em 1..64', () => {
@@ -71,5 +71,20 @@ describe('centerScroll', () => {
   it('centraliza e nunca negativa', () => {
     expect(centerScroll(400, 1000)).toBe(300);
     expect(centerScroll(400, 200)).toBe(0);
+  });
+});
+
+describe('cellFromView', () => {
+  it('converte offset em célula (canvas 32px a zoom 12 = 384px)', () => {
+    expect(cellFromView(0, 0, 384, 32)).toBe(0);
+    expect(cellFromView(0, 11.9, 384, 32)).toBe(0);
+    expect(cellFromView(0, 12, 384, 32)).toBe(1);
+    expect(cellFromView(0, 383.9, 384, 32)).toBe(31);
+  });
+  it('soma o scroll e rejeita fora dos limites', () => {
+    expect(cellFromView(100, 0, 1000, 32)).toBe(3);
+    expect(cellFromView(0, -1, 384, 32)).toBeNull();
+    expect(cellFromView(0, 384, 384, 32)).toBeNull();
+    expect(cellFromView(0, 0, 0, 32)).toBeNull();
   });
 });

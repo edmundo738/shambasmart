@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import {
-  Animation, Bone, BonePose, Frame, FrameAnchor, FrameHitbox, FramePose, Layer, ORIGINAL_VARIATION_ID, PlayMode,
+  Animation, Bone, BonePose, Cell, Frame, FrameAnchor, FrameHitbox, FramePose, Layer, ORIGINAL_VARIATION_ID, PlayMode,
   ProjectData, SelRect, ToolId, Variation, uid,
 } from '../types';
 import { emptyCells, moveRect } from '../lib/pixels';
@@ -10,6 +10,12 @@ import { clonePose, normalizeDeg, solveFK, worldToLocal, wouldCycle } from '../l
 import { createLayer, flattenCells, makeFrame, migrateProject } from '../lib/layers';
 import { normalizeHex } from '../lib/color';
 import { clampZoom } from '../lib/viewport';
+import {
+  anchorOffset, CanvasAnchor, clampCanvasSize, clampSelRect, flipCellsH, flipCellsV, flipHitboxH,
+  flipHitboxV, flipHMap, flipSelH, flipSelV, flipVMap, mapAnchor, PointMap, projectContentBounds,
+  resizeCells, scaleCellsNN, scaleHitbox, scaleMap, scaleSel, transformPose, transformRest,
+  translateHitbox, translateMap, translateSel,
+} from '../lib/canvas';
 import { TEMPLATES } from '../lib/templates';
 
 interface HistorySnap {
@@ -103,6 +109,16 @@ interface StudioState {
   clearViewport: () => void;
   panHeld: boolean;
   setPanHeld: (b: boolean) => void;
+  resizeCanvas: (w: number, h: number, anchor: CanvasAnchor) => void;
+  trimCanvas: (padding: number) => void;
+  scaleSprite: (w: number, h: number) => void;
+  flipCanvas: (axis: 'h' | 'v') => void;
+  canvasDialogOpen: boolean;
+  setCanvasDialogOpen: (b: boolean) => void;
+  showCanvasHandles: boolean;
+  setShowCanvasHandles: (b: boolean) => void;
+  gridSize: 1 | 2 | 4 | 8;
+  setGridSize: (n: 1 | 2 | 4 | 8) => void;
   setPlaying: (b: boolean) => void;
   select: (animId: string | null, frameId?: string | null) => void;
   setVariation: (id: string) => void;
@@ -202,6 +218,35 @@ interface StudioState {
 }
 
 const HISTORY_LIMIT = 60;
+
+/** Reaplica pixels + âncoras + hitbox + rig + seleção sob um remapeamento (undo único). */
+function applyCanvasRemap(
+  s: StudioState, p: ProjectData, newW: number, newH: number,
+  celFn: (cells: Cell[]) => Cell[], pointMap: PointMap,
+  hbFn: (b: FrameHitbox) => FrameHitbox, selFn: (r: SelRect) => SelRect,
+): Partial<StudioState> {
+  const hist = pushHistory(s);
+  const rig = p.rig ?? [];
+  const newRig = transformRest(rig, pointMap);
+  const frames: Record<string, Frame> = {};
+  for (const [fid, f] of Object.entries(p.frames)) {
+    const cels: Record<string, Cell[]> = {};
+    for (const l of p.layers) cels[l.id] = celFn(f.cels[l.id] ?? emptyCells(p.width, p.height));
+    frames[fid] = {
+      ...f,
+      cels,
+      anchors: f.anchors.map((a) => mapAnchor(a, pointMap)),
+      hitbox: f.hitbox ? hbFn(f.hitbox) : null,
+      pose: f.pose ? transformPose(rig, newRig, f.pose, pointMap) : undefined,
+    };
+    if (!frames[fid].pose) delete frames[fid].pose;
+  }
+  return {
+    ...hist,
+    project: { ...p, width: newW, height: newH, frames, rig: newRig, updatedAt: Date.now() },
+    selection: s.selection ? clampSelRect(selFn(s.selection), newW, newH) : null,
+  };
+}
 
 function pushHistory(state: StudioState): Partial<StudioState> {
   if (!state.project) return {};
@@ -329,6 +374,9 @@ export const useStudio = create<StudioState>((set, get) => ({
   zoom: 12,
   viewportRequest: null,
   panHeld: false,
+  canvasDialogOpen: false,
+  showCanvasHandles: false,
+  gridSize: 1,
   playing: true,
   currentAnimationId: null,
   currentFrameId: null,
@@ -420,6 +468,61 @@ export const useStudio = create<StudioState>((set, get) => ({
   clearViewport: () => set({ viewportRequest: null }),
   setPanHeld: (panHeld) => set({ panHeld }),
   setPlaying: (playing) => set({ playing }),
+
+  // canvas (E1+): uma operação = pixels + meta + rig + seleção, com undo único
+  resizeCanvas: (w, h, anchor) => set((s) => {
+    const p = s.project;
+    if (!p) return {};
+    const newW = clampCanvasSize(w), newH = clampCanvasSize(h);
+    if (newW === p.width && newH === p.height) return {};
+    const { dx, dy } = anchorOffset(anchor, p.width, p.height, newW, newH);
+    return applyCanvasRemap(s, p, newW, newH,
+      (c) => resizeCells(c, p.width, p.height, newW, newH, dx, dy),
+      translateMap(dx, dy),
+      (b) => translateHitbox(b, dx, dy),
+      (r) => translateSel(r, dx, dy));
+  }),
+  trimCanvas: (padding) => set((s) => {
+    const p = s.project;
+    if (!p) return {};
+    const b = projectContentBounds(p);
+    if (!b) return {};
+    const pad = Math.max(0, Math.min(64, Math.round(padding)));
+    const newW = clampCanvasSize(b.w + pad * 2), newH = clampCanvasSize(b.h + pad * 2);
+    if (newW === p.width && newH === p.height) return {};
+    // conteúdo em (pad,pad); se o clamp estourou, centraliza o conteúdo
+    const dx = newW >= b.w + pad * 2 ? pad - b.x : Math.round((newW - b.w) / 2) - b.x;
+    const dy = newH >= b.h + pad * 2 ? pad - b.y : Math.round((newH - b.h) / 2) - b.y;
+    return applyCanvasRemap(s, p, newW, newH,
+      (c) => resizeCells(c, p.width, p.height, newW, newH, dx, dy),
+      translateMap(dx, dy),
+      (hb) => translateHitbox(hb, dx, dy),
+      (r) => translateSel(r, dx, dy));
+  }),
+  scaleSprite: (w, h) => set((s) => {
+    const p = s.project;
+    if (!p) return {};
+    const newW = clampCanvasSize(w), newH = clampCanvasSize(h);
+    if (newW === p.width && newH === p.height) return {};
+    const sx = newW / p.width, sy = newH / p.height;
+    return applyCanvasRemap(s, p, newW, newH,
+      (c) => scaleCellsNN(c, p.width, p.height, newW, newH),
+      scaleMap(sx, sy),
+      (b) => scaleHitbox(b, sx, sy),
+      (r) => scaleSel(r, sx, sy));
+  }),
+  flipCanvas: (axis) => set((s) => {
+    const p = s.project;
+    if (!p) return {};
+    return axis === 'h'
+      ? applyCanvasRemap(s, p, p.width, p.height, (c) => flipCellsH(c, p.width, p.height),
+        flipHMap(p.width), (b) => flipHitboxH(b, p.width), (r) => flipSelH(r, p.width))
+      : applyCanvasRemap(s, p, p.width, p.height, (c) => flipCellsV(c, p.width, p.height),
+        flipVMap(p.height), (b) => flipHitboxV(b, p.height), (r) => flipSelV(r, p.height));
+  }),
+  setCanvasDialogOpen: (canvasDialogOpen) => set({ canvasDialogOpen }),
+  setShowCanvasHandles: (showCanvasHandles) => set({ showCanvasHandles }),
+  setGridSize: (gridSize) => set({ gridSize }),
 
   select: (animId, frameId) => set((s) => {
     if (!s.project) return {};

@@ -17,6 +17,7 @@ import LayersPanel from '../components/studio/LayersPanel';
 import MetaPanel from '../components/studio/MetaPanel';
 import BonesPanel from '../components/studio/BonesPanel';
 import ExportModal from '../components/studio/ExportModal';
+import CanvasSizeModal from '../components/studio/CanvasSizeModal';
 import { TEMPLATES } from '../lib/templates';
 
 type LeftTab = 'anim' | 'var' | 'palette';
@@ -32,6 +33,7 @@ export default function Studio() {
   const project = useStudio((s) => s.project);
   const dirty = useStudio((s) => s.dirty);
   const markSaved = useStudio((s) => s.markSaved);
+  const canvasDialogOpen = useStudio((s) => s.canvasDialogOpen);
   const saveProject = useProjects((s) => s.saveProject);
   const loadProjectFull = useProjects((s) => s.loadProjectFull);
 
@@ -137,6 +139,7 @@ export default function Studio() {
         case '1': st.requestViewport('z100'); break;
         case '2': st.requestViewport('z200'); break;
         case 'h': if (!e.repeat) st.setPanHeld(true); break;
+        case 'c': st.setCanvasDialogOpen(true); break;
         case 'p': st.togglePixelPerfect(); break;
         case 'x': st.toggleMirrorX(); break;
         case 'y': st.toggleMirrorY(); break;
@@ -156,6 +159,7 @@ export default function Studio() {
           break;
         }
         case 'escape': {
+          if (st.showCanvasHandles) { st.setShowCanvasHandles(false); break; }
           if (st.selection) st.setSelection(null);
           break;
         }
@@ -271,6 +275,7 @@ export default function Studio() {
       </div>
 
       {exportOpen && <ExportModal onClose={() => setExportOpen(false)} />}
+      {canvasDialogOpen && <CanvasSizeModal />}
     </div>
   );
 }

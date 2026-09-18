@@ -16,6 +16,7 @@ import {
 import { compositeStack, flattenCells } from '../../lib/layers';
 import { pickAnchor, pointInHitbox } from '../../lib/frameMeta';
 import { angleTo, distToSegment, normalizeDeg, snapWorldBone, solveFK, worldToLocal, WorldBone } from '../../lib/fk';
+import { cellFromView } from '../../lib/viewport';
 
 export default function PixelCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -38,6 +39,7 @@ export default function PixelCanvas() {
   const mirrorX = useStudio((s) => s.mirrorX);
   const mirrorY = useStudio((s) => s.mirrorY);
   const showGrid = useStudio((s) => s.showGrid);
+  const gridSize = useStudio((s) => s.gridSize);
   const onionSkin = useStudio((s) => s.onionSkin);
   const onionPrev = useStudio((s) => s.onionPrev);
   const onionNext = useStudio((s) => s.onionNext);
@@ -101,30 +103,42 @@ export default function PixelCanvas() {
     }
     ctx.globalAlpha = 1;
 
-    // grade
-    if (showGrid && zoom >= 6) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+    // grade: menor a cada gridSize, maior a cada 8x (tile-friendly)
+    if (showGrid) {
       ctx.lineWidth = 1;
-      ctx.beginPath();
-      for (let x = 0; x <= w; x++) {
-        ctx.moveTo(x * zoom + 0.5, 0);
-        ctx.lineTo(x * zoom + 0.5, h * zoom);
-      }
-      for (let y = 0; y <= h; y++) {
-        ctx.moveTo(0, y * zoom + 0.5);
-        ctx.lineTo(w * zoom, y * zoom + 0.5);
-      }
-      ctx.stroke();
+      const tier = (step: number, style: string) => {
+        ctx.strokeStyle = style;
+        ctx.beginPath();
+        for (let x = 0; x <= w; x += step) {
+          ctx.moveTo(x * zoom + 0.5, 0);
+          ctx.lineTo(x * zoom + 0.5, h * zoom);
+        }
+        if (w % step !== 0) {
+          ctx.moveTo(w * zoom + 0.5, 0);
+          ctx.lineTo(w * zoom + 0.5, h * zoom);
+        }
+        for (let y = 0; y <= h; y += step) {
+          ctx.moveTo(0, y * zoom + 0.5);
+          ctx.lineTo(w * zoom, y * zoom + 0.5);
+        }
+        if (h % step !== 0) {
+          ctx.moveTo(0, h * zoom + 0.5);
+          ctx.lineTo(w * zoom, h * zoom + 0.5);
+        }
+        ctx.stroke();
+      };
+      if (zoom * gridSize >= 6) tier(gridSize, 'rgba(255,255,255,0.07)');
+      if (zoom * gridSize * 8 >= 8) tier(gridSize * 8, 'rgba(255,255,255,0.16)');
     }
-  }, [project, frame, frameIndex, currentAnimationId, zoom, showGrid, onionSkin, onionPrev, onionNext, onionOpacity, onionTintPrev, onionTintNext]);
+  }, [project, frame, frameIndex, currentAnimationId, zoom, showGrid, gridSize, onionSkin, onionPrev, onionNext, onionOpacity, onionTintPrev, onionTintNext]);
 
   const cellFromEvent = useCallback((e: React.PointerEvent): [number, number] | null => {
     const canvas = canvasRef.current;
     if (!canvas || !project) return null;
     const rect = canvas.getBoundingClientRect();
-    const x = Math.floor(((e.clientX - rect.left) / rect.width) * project.width);
-    const y = Math.floor(((e.clientY - rect.top) / rect.height) * project.height);
-    if (!inBounds(x, y, project.width, project.height)) return null;
+    const x = cellFromView(0, e.clientX - rect.left, rect.width, project.width);
+    const y = cellFromView(0, e.clientY - rect.top, rect.height, project.height);
+    if (x === null || y === null) return null;
     return [x, y];
   }, [project]);
 
