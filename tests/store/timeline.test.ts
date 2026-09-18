@@ -22,7 +22,7 @@ function fixture(): ProjectData {
     frames: { [f0.id]: f0, [f1.id]: f1, [f2.id]: f2 },
     animations: [{ id: 'an', name: 'idle', fps: 8, frameIds: [f0.id, f1.id, f2.id], playMode: 'loop' }],
     variations: [], palette: [],
-    createdAt: 0, updatedAt: 0,
+    rig: [], createdAt: 0, updatedAt: 0,
   };
 }
 

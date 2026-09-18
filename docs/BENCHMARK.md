@@ -101,11 +101,14 @@ Legenda de status: ✅ sólido · 🟡 funcional mas amador · 🔴 ausente/frá
 - **REFERENCE (SpriteForge/SkelForm/Spine):** hierarquia pai-filho com transforms locais/
   mundo matematicamente corretos, IK two-bone + FABRIK estável com limites, meshes com
   pesos, curvas de interpolação.
-- **CURRENT:** rig procedural paramétrico (`rig.ts`: nós com attach/pivot/z + poses por
-  ação) + retarget image-space com 7 presets — ótimo para geração, mas **não é um rig
-  editável**: sem bones manipuláveis, sem IK, sem skinning de PNG importado.
-- **TARGET FASE D/E:** Bone {pos, rot, scale, length, parent, children}, FK correto,
-  two-bone IK + foot planting, tudo com teste matemático; render pixel-snapped (§14).
+- **CURRENT (D2 entregue):** rig editável por projeto (`rig: Bone[]`, rest local
+  x/y/rotation/length) + poses esparsas por frame (`Frame.pose`); FK puro em
+  `src/lib/fk.ts` (20 testes); overlay pixel-snapped no canvas; tool N (cria
+  root/filho, arrastar junta = move, arrastar corpo = gira); ghosts das poses no
+  onion skin; `BonesPanel` (lista/hierarquia/rest/pose/copiar/colar); rig + poses no
+  `pack.json`. Sem IK, sem skinning (fora do escopo D2).
+- **TARGET FASE D/E:** two-bone IK + foot planting sobre o FK atual, tudo com teste
+  matemático; curvas entram na FASE F.
 
 ## KEYFRAMES / CURVES 🔴 → FASE F
 
@@ -127,8 +130,8 @@ Legenda de status: ✅ sólido · 🟡 funcional mas amador · 🔴 ausente/frá
 - **REFERENCE (Aseprite CLI):** PNG, GIF/APNG, spritesheet + JSON com anchors/hitboxes,
   frames individuais, export por tag/variação.
 - **CURRENT:** ZIP com spritesheets + GIF + JSON por animação/variação, escala inteira,
-  fundo configurável. Sólido para packs; sem APNG, sem frames avulsos, sem metadata
-  de anchors/hitboxes.
+  fundo configurável; `pack.json` com anchors/hitbox (D1) + rig/poses (D2).
+  Sólido para packs; sem APNG, sem frames avulsos.
 - **TARGET:** + frames PNG avulsos + APNG; anchors/hitboxes com o rig (FASE D).
 
 ## AUTOSAVE 🟡 → FASE H

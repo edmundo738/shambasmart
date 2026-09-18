@@ -19,7 +19,7 @@ function TemplateCard({ id }: { id: string }) {
   return (
     <button
       onClick={() => navigate(`/studio?template=${tpl.id}&name=${encodeURIComponent(tpl.name)}`)}
-      className="group overflow-hidden rounded-2xl border border-ink-700 bg-ink-900/60 text-left transition-all hover:-translate-y-0.5 hover:border-forge-500 hover:shadow-glow"
+      className="pf-shadow group overflow-hidden rounded-2xl border border-ink-700 bg-ink-900/60 text-left transition-all hover:-translate-y-0.5 hover:border-forge-500 hover:shadow-glow"
     >
       <div className="checker flex h-36 items-center justify-center">
         <AnimatedSprite frames={frames} width={32} height={32} fps={anim.fps} scale={4} className="transition-transform group-hover:scale-110" />
@@ -29,7 +29,7 @@ function TemplateCard({ id }: { id: string }) {
         <div className="mt-0.5 line-clamp-2 text-xs text-slate-400">{tpl.description}</div>
         <div className="mt-2 flex gap-1">
           {built.animations.map((a) => (
-            <span key={a.id} className="rounded-full bg-ink-800 px-2 py-0.5 font-mono text-[10px] text-forge-300">
+            <span key={a.id} className="pixel-corners-sm bg-ink-800 px-2 py-0.5 font-mono text-[10px] text-forge-300">
               {a.name}·{a.frameIds.length}f
             </span>
           ))}
@@ -51,7 +51,7 @@ function ProjectRow({ meta }: { meta: ProjectMeta }) {
   const date = new Date(meta.updatedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 
   return (
-    <div className="group flex items-center gap-4 rounded-2xl border border-ink-700 bg-ink-900/60 p-3 transition-colors hover:border-ink-600">
+    <div className="pf-shadow group flex items-center gap-4 rounded-2xl border border-ink-700 bg-ink-900/60 p-3 transition-colors hover:border-forge-700">
       <button onClick={() => navigate(`/studio/${meta.id}`)} className="checker h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-ink-700">
         {meta.thumb ? (
           <img src={meta.thumb} alt={meta.name} className="pixelated h-full w-full object-contain" />
@@ -98,7 +98,7 @@ function ProjectRow({ meta }: { meta: ProjectMeta }) {
           <>
             <button onClick={() => duplicateProject(meta.id)} title="Duplicar" className="rounded-lg p-2 text-slate-400 hover:bg-ink-800 hover:text-white"><Copy size={16} /></button>
             <button onClick={() => setConfirmDel(true)} title="Excluir" className="rounded-lg p-2 text-slate-400 hover:bg-ink-800 hover:text-red-400"><Trash2 size={16} /></button>
-            <button onClick={() => navigate(`/studio/${meta.id}`)} className="ml-1 rounded-lg bg-gradient-to-r from-forge-500 to-pixel-500 px-4 py-2 text-xs font-bold text-ink-950 hover:brightness-110">
+            <button onClick={() => navigate(`/studio/${meta.id}`)} className="btn-arcade pixel-corners-sm ml-1 bg-gradient-to-r from-forge-500 to-pixel-500 px-4 py-2 text-xs font-bold text-ink-950">
               Abrir
             </button>
           </>
@@ -126,14 +126,14 @@ export default function Projects() {
       <header className="sticky top-0 z-20 border-b border-ink-700 bg-ink-950/90 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4">
           <Link to="/" className="flex items-center gap-2">
-            <span className="grid h-8 w-8 grid-cols-2 overflow-hidden rounded-lg border border-ink-600">
+            <span className="pixel-corners-sm grid h-8 w-8 grid-cols-2 overflow-hidden border border-ink-600">
               <span className="bg-pixel-500" /><span className="bg-forge-500" />
               <span className="bg-ember-500" /><span className="bg-[#ff4d6d]" />
             </span>
-            <span className="font-display text-base font-bold text-white">PixelForge <span className="text-slate-500">Studio</span></span>
+            <span className="pf-title text-[10px] leading-relaxed text-white">PIXELFORGE <span className="text-slate-500">STUDIO</span></span>
           </Link>
           <div className="flex-1" />
-          <Link to="/gerador" className="flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-forge-500 to-pixel-500 px-3 py-2 text-xs font-bold text-ink-950 hover:brightness-110">
+          <Link to="/gerador" className="btn-arcade pixel-corners-sm flex items-center gap-1.5 bg-gradient-to-r from-forge-500 to-pixel-500 px-3 py-2 text-xs font-bold text-ink-950">
             <Sparkles size={14} /> Gerador de Sprites
           </Link>
           <Link to="/biblioteca" className="flex items-center gap-1.5 rounded-lg border border-forge-500/50 bg-forge-500/10 px-3 py-2 text-xs font-bold text-forge-300 hover:bg-forge-500/20">
@@ -161,10 +161,11 @@ export default function Projects() {
       <main className="mx-auto max-w-6xl px-4 pb-20">
         {/* criar do zero */}
         <section className="mt-8">
-          <h1 className="font-display text-2xl font-bold text-white">Criar novo sprite</h1>
+          <p className="pf-eyebrow mb-1 text-[10px] text-forge-400">▸ novo sprite</p>
+          <h1 className="font-display text-2xl font-bold text-white drop-shadow-[2px_2px_0_rgba(0,0,0,0.8)]">Criar novo sprite</h1>
           <p className="mt-1 text-sm text-slate-400">Comece do zero ou de um modelo animado pronto.</p>
 
-          <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-ink-700 bg-ink-900/60 p-4 sm:flex-row sm:items-end">
+          <div className="pf-shadow mt-4 flex flex-col gap-3 rounded-2xl border border-ink-700 bg-ink-900/60 p-4 sm:flex-row sm:items-end">
             <label className="block flex-1 text-xs text-slate-400">
               Nome do sprite
               <input
@@ -182,14 +183,14 @@ export default function Projects() {
                   <button
                     key={s}
                     onClick={() => setSize(s)}
-                    className={`rounded-lg px-3 py-2.5 font-mono text-xs ${size === s ? 'bg-forge-500/20 text-forge-300 ring-1 ring-forge-500' : 'bg-ink-950 text-slate-400 hover:text-white'}`}
+                    className={`pixel-corners-sm px-3 py-2.5 font-mono text-xs font-bold ${size === s ? 'bg-forge-500/20 text-forge-300 ring-1 ring-forge-500' : 'bg-ink-950 text-slate-400 hover:text-white'}`}
                   >
                     {s}²
                   </button>
                 ))}
               </div>
             </div>
-            <button onClick={createBlank} className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-forge-500 to-pixel-500 px-6 py-2.5 text-sm font-bold text-ink-950 hover:brightness-110">
+            <button onClick={createBlank} className="btn-arcade pixel-corners-sm flex items-center justify-center gap-2 bg-gradient-to-r from-forge-500 to-pixel-500 px-6 py-2.5 text-sm font-bold text-ink-950">
               <Plus size={16} /> Criar em branco
             </button>
           </div>
@@ -197,7 +198,8 @@ export default function Projects() {
 
         {/* templates */}
         <section className="mt-8">
-          <h2 className="flex items-center gap-2 font-display text-lg font-bold text-white">
+          <p className="pf-eyebrow mb-1 text-[10px] text-ember-400">▸ modelos</p>
+          <h2 className="flex items-center gap-2 font-display text-lg font-bold text-white drop-shadow-[2px_2px_0_rgba(0,0,0,0.8)]">
             <Sparkles size={18} className="text-ember-400" /> Modelos animados prontos
           </h2>
           <p className="mt-1 text-sm text-slate-400">Cada modelo já vem com ações sequenciadas — edite, crie variações e exporte o pack.</p>
@@ -208,7 +210,8 @@ export default function Projects() {
 
         {/* salvos */}
         <section className="mt-10">
-          <h2 className="font-display text-lg font-bold text-white">Meus projetos <span className="text-slate-500">({metas.length})</span></h2>
+          <p className="pf-eyebrow mb-1 text-[10px] text-pixel-400">▸ salvos no navegador</p>
+          <h2 className="font-display text-lg font-bold text-white drop-shadow-[2px_2px_0_rgba(0,0,0,0.8)]">Meus projetos <span className="text-slate-500">({metas.length})</span></h2>
           <p className="mt-1 text-sm text-slate-400">Salvos automaticamente neste navegador.</p>
           <div className="mt-4 flex flex-col gap-3">
             {metas.length === 0 && (
@@ -222,6 +225,7 @@ export default function Projects() {
 
         {/* planos */}
         <section className="mt-14">
+          <p className="pf-eyebrow mb-2 text-center text-[10px] text-forge-400">▸ planos</p>
           <h2 className="text-center font-display text-xl font-bold text-white">Planos para cada fase do seu jogo</h2>
           <p className="mt-1 text-center text-sm text-slate-400">Comece grátis. Escale quando o pack crescer.</p>
           <div className="mt-6"><PlanCards /></div>

@@ -4,6 +4,7 @@ import { ArrowLeft, Check, Cloud, Download, FlaskConical, Redo2, Undo2, User as 
 import { useStudio } from '../../store/studio';
 import { useAuth } from '../../store/auth';
 import AuthModal from '../AuthModal';
+import CrtToggle from '../CrtToggle';
 
 export default function TopBar({ onExport }: { onExport: () => void }) {
   const project = useStudio((s) => s.project);
@@ -19,16 +20,16 @@ export default function TopBar({ onExport }: { onExport: () => void }) {
   const [draft, setDraft] = useState('');
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-3 border-b border-ink-700 bg-ink-900/90 px-3 backdrop-blur">
+    <header className="flex h-14 shrink-0 items-center gap-3 border-b-2 border-ink-600 bg-gradient-to-b from-ink-800 to-ink-900/95 px-3 backdrop-blur">
       <Link to="/projetos" title="Meus projetos" className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-ink-800 hover:text-white">
         <ArrowLeft size={18} />
       </Link>
       <Link to="/" className="flex items-center gap-2">
-        <span className="grid h-8 w-8 grid-cols-2 overflow-hidden rounded-lg border border-ink-600">
+        <span className="pixel-corners-sm grid h-8 w-8 grid-cols-2 overflow-hidden border border-ink-600">
           <span className="bg-pixel-500" /><span className="bg-forge-500" />
           <span className="bg-ember-500" /><span className="bg-[#ff4d6d]" />
         </span>
-        <span className="hidden font-display text-sm font-bold text-white sm:block">PixelForge</span>
+        <span className="pf-title hidden text-[9px] leading-relaxed text-white sm:block">PIXELFORGE<span className="animate-blink text-pixel-400">_</span></span>
       </Link>
 
       <div className="mx-1 h-6 w-px bg-ink-700" />
@@ -57,7 +58,7 @@ export default function TopBar({ onExport }: { onExport: () => void }) {
         )
       )}
 
-      <span className="hidden items-center gap-1.5 rounded-full bg-ink-800 px-2.5 py-1 text-[11px] text-slate-400 sm:flex">
+      <span className="pixel-corners-sm hidden items-center gap-1.5 bg-ink-800 px-2.5 py-1 font-mono text-[11px] text-slate-400 sm:flex">
         {dirty ? (
           <><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-ember-400" /> editando…</>
         ) : (
@@ -78,6 +79,8 @@ export default function TopBar({ onExport }: { onExport: () => void }) {
         <FlaskConical size={17} />
       </Link>
 
+      <CrtToggle className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-ink-800 hover:text-forge-300" />
+
       {user ? (
         <span className="hidden items-center gap-1.5 rounded-full border border-ink-600 bg-ink-800 px-3 py-1.5 text-xs font-semibold text-slate-200 md:flex" title={user.email}>
           <span className="flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-forge-500 to-pixel-500 text-[10px] font-bold text-ink-950">
@@ -96,7 +99,7 @@ export default function TopBar({ onExport }: { onExport: () => void }) {
 
       <button
         onClick={onExport}
-        className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-forge-500 to-pixel-500 px-4 py-2 text-sm font-bold text-ink-950 hover:brightness-110"
+        className="btn-arcade pixel-corners-sm flex items-center gap-2 bg-gradient-to-r from-forge-500 to-pixel-500 px-4 py-2 text-sm font-bold text-ink-950"
       >
         <Download size={16} /> <span className="hidden sm:inline">Exportar pack</span><span className="sm:hidden">ZIP</span>
       </button>

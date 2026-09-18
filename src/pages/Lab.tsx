@@ -104,6 +104,7 @@ export default function Lab() {
         { id: uid('vr'), name: 'forja', mapping: {}, hue: 120, sat: 15, light: 0 },
       ],
       palette: spec.swatches,
+      rig: [],
       createdAt: now,
       updatedAt: now,
     };
@@ -170,7 +171,7 @@ export default function Lab() {
             <span className="bg-ember-500" /><span className="bg-[#ff4d6d]" />
           </span>
           <div>
-            <h1 className="flex items-center gap-2 font-display text-base font-bold text-white">
+            <h1 className="flex items-center gap-2 font-display text-base font-bold text-white drop-shadow-[2px_2px_0_rgba(0,0,0,0.8)]">
               <FlaskConical size={16} className="text-pixel-400" /> Laboratório Procedural
             </h1>
             <p className="text-[11px] text-slate-500">Personagens + movimentos gerados por algoritmo, com seed</p>
@@ -179,7 +180,7 @@ export default function Lab() {
           <div className="hidden items-center gap-2 sm:flex">
             <span className="font-mono text-xs text-slate-500">seed</span>
             <span className="rounded-lg bg-ink-800 px-3 py-1.5 font-mono text-sm font-bold text-pixel-400">{seed}</span>
-            <button onClick={() => setSeed(randomSeed())} title="Novo personagem aleatório" className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-r from-forge-500 to-pixel-500 text-ink-950 hover:brightness-110">
+            <button onClick={() => setSeed(randomSeed())} title="Novo personagem aleatório" className="flex h-9 w-9 items-center justify-center btn-arcade rounded-lg bg-gradient-to-r from-forge-500 to-pixel-500 text-ink-950">
               <Dices size={17} />
             </button>
           </div>
@@ -188,7 +189,7 @@ export default function Lab() {
 
       <main className="mx-auto grid max-w-7xl gap-4 px-4 pb-20 pt-6 lg:grid-cols-[280px_1fr_300px]">
         {/* controles */}
-        <aside className="flex flex-col gap-4 rounded-2xl border border-ink-700 bg-ink-900/50 p-4">
+        <aside className="flex flex-col gap-4 pf-shadow rounded-2xl border border-ink-700 bg-ink-900/50 p-4">
           <div>
             <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Corpo</span>
             <div className="grid grid-cols-2 gap-1.5">
@@ -287,7 +288,7 @@ export default function Lab() {
 
         {/* palco */}
         <section className="flex min-w-0 flex-col gap-4">
-          <div className="overflow-hidden rounded-2xl border border-ink-700 bg-ink-900/50">
+          <div className="overflow-hidden pf-shadow rounded-2xl border border-ink-700 bg-ink-900/50">
             <div className="flex items-center gap-2 border-b border-ink-700 bg-ink-900/80 px-4 py-2.5">
               <Dna size={15} className="text-pixel-400" />
               <span className="font-display text-sm font-bold text-white">{spec.name}</span>
@@ -318,7 +319,7 @@ export default function Lab() {
           </div>
 
           {/* DNA */}
-          <div className="rounded-2xl border border-ink-700 bg-ink-900/50 p-4">
+          <div className="pf-shadow rounded-2xl border border-ink-700 bg-ink-900/50 p-4">
             <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">DNA do personagem</h3>
             <div className="flex flex-wrap gap-1.5">
               {spec.traits.map((t) => (
@@ -335,7 +336,7 @@ export default function Lab() {
           {/* enviar */}
           {notice && <div className="rounded-xl border border-ember-400/40 bg-ember-500/10 p-3 text-xs text-ember-400">{notice}</div>}
           <div className="flex flex-col gap-2 sm:flex-row">
-            <button onClick={createProject} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-forge-500 to-pixel-500 px-6 py-3.5 text-sm font-bold text-ink-950 hover:brightness-110">
+            <button onClick={createProject} className="flex flex-1 items-center justify-center gap-2 btn-arcade pixel-corners-sm bg-gradient-to-r from-forge-500 to-pixel-500 px-6 py-3.5 text-sm font-bold text-ink-950 hover:brightness-110">
               <Send size={16} /> Enviar para o Studio ({enabledActions.length} ações)
             </button>
             <button
@@ -353,7 +354,7 @@ export default function Lab() {
         </section>
 
         {/* candidatos */}
-        <aside className="flex flex-col gap-3 rounded-2xl border border-ink-700 bg-ink-900/50 p-4">
+        <aside className="flex flex-col gap-3 pf-shadow rounded-2xl border border-ink-700 bg-ink-900/50 p-4">
           <div className="flex items-center justify-between">
             <h3 className="flex items-center gap-1.5 text-sm font-bold text-white"><Shuffle size={14} className="text-ember-400" /> Candidatos</h3>
             <button onClick={() => setGalleryBase(randomSeed())} title="Embaralhar candidatos" className="rounded-lg border border-ink-700 p-1.5 text-slate-400 hover:text-white">

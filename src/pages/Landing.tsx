@@ -9,6 +9,7 @@ import { frameItem } from '../lib/layers';
 import { Variation } from '../types';
 import { AnimatedSprite } from '../components/SpriteView';
 import AuthModal from '../components/AuthModal';
+import CrtToggle from '../components/CrtToggle';
 import { PlanCards } from '../components/PricingModal';
 import { useAuth } from '../store/auth';
 
@@ -23,11 +24,11 @@ const SHOWCASE_VARS: Array<{ name: string; v: Variation | null }> = [
 function Logo() {
   return (
     <span className="flex items-center gap-2">
-      <span className="grid h-8 w-8 grid-cols-2 overflow-hidden rounded-lg border border-ink-600">
+      <span className="pixel-corners-sm grid h-8 w-8 grid-cols-2 overflow-hidden border border-ink-600">
         <span className="bg-pixel-500" /><span className="bg-forge-500" />
         <span className="bg-ember-500" /><span className="bg-[#ff4d6d]" />
       </span>
-      <span className="font-display text-base font-bold text-white">PixelForge <span className="font-medium text-slate-500">Studio</span></span>
+      <span className="pf-title text-[10px] leading-relaxed text-white">PIXELFORGE <span className="text-slate-500">STUDIO</span></span>
     </span>
   );
 }
@@ -80,7 +81,8 @@ export default function Landing() {
               <UserIcon size={15} /> Entrar
             </button>
           )}
-          <Link to="/projetos" className="flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-forge-500 to-pixel-500 px-4 py-2 text-sm font-bold text-ink-950 hover:brightness-110">
+          <CrtToggle className="hidden h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-ink-800 hover:text-forge-300 sm:flex" />
+          <Link to="/projetos" className="btn-arcade pixel-corners-sm flex items-center gap-1.5 bg-gradient-to-r from-forge-500 to-pixel-500 px-4 py-2 text-sm font-bold text-ink-950">
             Criar sprite <ArrowRight size={15} />
           </Link>
         </div>
@@ -91,10 +93,10 @@ export default function Landing() {
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_-10%,rgba(34,184,240,0.15),transparent_55%),radial-gradient(ellipse_at_80%_110%,rgba(142,224,0,0.1),transparent_50%)]" />
         <div className="relative mx-auto grid max-w-6xl gap-10 px-4 pb-16 pt-14 lg:grid-cols-2 lg:items-center lg:pt-20">
           <div>
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-pixel-500/40 bg-pixel-500/10 px-3 py-1 text-xs font-semibold text-pixel-400">
+            <div className="pixel-corners-sm mb-4 inline-flex items-center gap-2 border border-pixel-500/40 bg-pixel-500/10 px-3 py-1 font-mono text-xs font-semibold text-pixel-400">
               <Sparkles size={13} /> Novo: forja automática de variações
             </div>
-            <h1 className="font-display text-4xl font-bold leading-tight text-white sm:text-5xl">
+            <h1 className="font-display text-4xl font-bold leading-tight text-white drop-shadow-[3px_3px_0_rgba(0,0,0,0.8)] sm:text-5xl">
               Um modelo.
               <br />
               <span className="bg-gradient-to-r from-forge-400 via-pixel-400 to-ember-400 bg-clip-text text-transparent">
@@ -107,10 +109,10 @@ export default function Landing() {
               exportarem <strong className="text-slate-200">asset packs prontos</strong> para Godot, Unity, Phaser e GameMaker.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <Link to="/projetos" className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-forge-500 to-pixel-500 px-6 py-3 text-sm font-bold text-ink-950 shadow-glow hover:brightness-110">
+              <Link to="/projetos" className="flex items-center gap-2 btn-arcade pixel-corners-sm bg-gradient-to-r from-forge-500 to-pixel-500 px-6 py-3 text-sm font-bold text-ink-950 shadow-glow hover:brightness-110">
                 <Brush size={16} /> Começar a criar grátis
               </Link>
-              <a href="#vitrine" className="flex items-center gap-2 rounded-xl border border-ink-600 px-6 py-3 text-sm font-semibold text-slate-200 hover:border-forge-500">
+              <a href="#vitrine" className="pixel-corners-sm flex items-center gap-2 border-2 border-ink-600 px-6 py-3 text-sm font-semibold text-slate-200 hover:border-forge-500">
                 <Gamepad2 size={16} /> Ver pack de exemplo
               </a>
             </div>
@@ -123,11 +125,11 @@ export default function Landing() {
 
           {/* palco animado */}
           <div className="relative">
-            <div className="checker overflow-hidden rounded-2xl border border-ink-600 shadow-2xl">
+            <div className="cabinet checker animate-rise overflow-hidden rounded-2xl">
               <div className="flex items-center gap-2 border-b border-ink-700 bg-ink-900/90 px-4 py-2.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-[#ff4d6d]" />
-                <span className="h-2.5 w-2.5 rounded-full bg-ember-400" />
-                <span className="h-2.5 w-2.5 rounded-full bg-pixel-500" />
+                <span className="h-2.5 w-2.5 rounded-[2px] bg-[#ff4d6d]" />
+                <span className="h-2.5 w-2.5 rounded-[2px] bg-ember-400" />
+                <span className="h-2.5 w-2.5 rounded-[2px] bg-pixel-500" />
                 <span className="ml-2 font-mono text-[11px] text-slate-400">cavaleiro__original — andar · 8fps</span>
               </div>
               <div className="flex items-end justify-around px-6 pb-6 pt-8">
@@ -152,21 +154,25 @@ export default function Landing() {
                 <span className="font-mono text-[11px] text-slate-400">pack.zip <span className="text-pixel-400">↓ 47 arquivos</span><span className="animate-blink text-forge-300">▌</span></span>
               </div>
             </div>
-            <div className="absolute -right-3 -top-3 rotate-3 rounded-xl border border-ember-400/50 bg-ink-950 px-3 py-2 font-mono text-[11px] text-ember-400 shadow-xl">
+            <div className="pixel-corners-sm absolute -right-3 -top-3 rotate-3 border border-ember-400/50 bg-ink-950 px-3 py-2 font-mono text-[11px] text-ember-400 shadow-xl">
               andar__gelo.png ✓
             </div>
-            <div className="absolute -left-3 bottom-16 -rotate-2 rounded-xl border border-pixel-500/50 bg-ink-950 px-3 py-2 font-mono text-[11px] text-pixel-400 shadow-xl">
+            <div className="pixel-corners-sm absolute -left-3 bottom-16 -rotate-2 border border-pixel-500/50 bg-ink-950 px-3 py-2 font-mono text-[11px] text-pixel-400 shadow-xl">
               ataque__veneno.gif ✓
             </div>
           </div>
         </div>
 
         {/* engines */}
-        <div className="relative border-y border-ink-800 bg-ink-900/40">
-          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-10 gap-y-3 px-4 py-4 text-sm font-semibold text-slate-500">
-            <span className="text-xs font-medium uppercase tracking-widest">Exporta para</span>
-            {['Godot', 'Unity', 'Phaser 3', 'GameMaker', 'Construct'].map((e) => (
-              <span key={e} className="font-display tracking-wide text-slate-300">{e}</span>
+        <div className="relative overflow-hidden border-y border-ink-800 bg-ink-900/40">
+          <div className="animate-marquee flex w-max items-center gap-x-10 px-4 py-4 text-sm font-semibold">
+            {[0, 1].map((copy) => (
+              <div key={copy} aria-hidden={copy === 1} className="flex items-center gap-x-10">
+                <span className="pf-eyebrow text-[10px] text-slate-500">▸ exporta para</span>
+                {['Godot', 'Unity', 'Phaser 3', 'GameMaker', 'Construct', 'Spritesheets', 'GIF', 'Pixel Art'].map((e) => (
+                  <span key={e} className="font-display tracking-wide text-slate-300">{e}</span>
+                ))}
+              </div>
             ))}
           </div>
         </div>
@@ -174,7 +180,8 @@ export default function Landing() {
 
       {/* RECURSOS */}
       <section id="recursos" className="mx-auto max-w-6xl px-4 py-16">
-        <h2 className="text-center font-display text-3xl font-bold text-white">Tudo que um asset 2D precisa</h2>
+        <p className="pf-eyebrow mb-2 text-center text-[10px] text-forge-400">▸ recursos</p>
+        <h2 className="text-center font-display text-3xl font-bold text-white drop-shadow-[2px_2px_0_rgba(0,0,0,0.8)]">Tudo que um asset 2D precisa</h2>
         <p className="mx-auto mt-2 max-w-xl text-center text-sm text-slate-400">
           Do primeiro pixel ao pack final, sem trocar de ferramenta.
         </p>
@@ -187,7 +194,7 @@ export default function Landing() {
             { icon: <FileJson size={20} />, color: 'text-cyan-300 bg-cyan-500/10 border-cyan-500/30', title: 'Metadados por engine', desc: 'JSON no formato certo para Phaser, Godot, Unity e GameMaker. Chega de fatiar na mão.' },
             { icon: <Download size={20} />, color: 'text-lime-300 bg-lime-500/10 border-lime-500/30', title: 'Pack ZIP organizado', desc: 'Spritesheets, GIFs, frames avulsos e manifesto — nomeados como andar__gelo_f00.png.' },
           ].map((f) => (
-            <div key={f.title} className="rounded-2xl border border-ink-700 bg-ink-900/50 p-5 transition-colors hover:border-ink-600">
+            <div key={f.title} className="pf-shadow-sm rounded-2xl border border-ink-700 bg-ink-900/50 p-5 transition-all hover:-translate-y-0.5 hover:border-forge-700">
               <div className={`mb-3 flex h-10 w-10 items-center justify-center rounded-xl border ${f.color}`}>{f.icon}</div>
               <h3 className="font-display text-base font-bold text-white">{f.title}</h3>
               <p className="mt-1 text-sm leading-relaxed text-slate-400">{f.desc}</p>
@@ -199,15 +206,16 @@ export default function Landing() {
       {/* COMO FUNCIONA */}
       <section id="como-funciona" className="border-y border-ink-800 bg-ink-900/40 py-16">
         <div className="mx-auto max-w-6xl px-4">
-          <h2 className="text-center font-display text-3xl font-bold text-white">Do pixel ao jogo em 3 passos</h2>
+          <p className="pf-eyebrow mb-2 text-center text-[10px] text-pixel-400">▸ como funciona</p>
+          <h2 className="text-center font-display text-3xl font-bold text-white drop-shadow-[2px_2px_0_rgba(0,0,0,0.8)]">Do pixel ao jogo em 3 passos</h2>
           <div className="mt-8 grid gap-4 md:grid-cols-3">
             {[
               { n: '01', title: 'Modele o sprite', desc: 'Desenhe do zero ou parta de um modelo animado pronto: slime, cavaleiro, moeda, fantasma e mais.' },
               { n: '02', title: 'Anime as ações', desc: 'Crie idle, andar, pulo e ataque com timeline, onion skin e prévia em tempo real na velocidade do jogo.' },
               { n: '03', title: 'Forje e exporte', desc: 'Gere variações do mesmo modelo e baixe o pack ZIP sequenciado com spritesheets, JSON e GIFs.' },
             ].map((s) => (
-              <div key={s.n} className="relative overflow-hidden rounded-2xl border border-ink-700 bg-ink-950 p-6">
-                <span className="font-pixel text-2xl text-ink-600">{s.n}</span>
+              <div key={s.n} className="pf-shadow-sm relative overflow-hidden rounded-2xl border border-ink-700 bg-ink-950 p-6">
+                <span className="pf-title text-xl text-ink-500">{s.n}</span>
                 <h3 className="mt-2 font-display text-lg font-bold text-white">{s.title}</h3>
                 <p className="mt-1 text-sm leading-relaxed text-slate-400">{s.desc}</p>
               </div>
@@ -218,17 +226,18 @@ export default function Landing() {
 
       {/* VITRINE */}
       <section id="vitrine" className="mx-auto max-w-6xl px-4 py-16">
-        <h2 className="text-center font-display text-3xl font-bold text-white">
+        <p className="pf-eyebrow mb-2 text-center text-[10px] text-ember-400">▸ vitrine real</p>
+        <h2 className="text-center font-display text-3xl font-bold text-white drop-shadow-[2px_2px_0_rgba(0,0,0,0.8)]">
           Um modelo <span className="text-slate-500">→</span> <span className="bg-gradient-to-r from-forge-400 to-pixel-400 bg-clip-text text-transparent">pack completo</span>
         </h2>
         <p className="mx-auto mt-2 max-w-xl text-center text-sm text-slate-400">
           Isto é real: o mesmo cavaleiro, 3 ações × 5 variações = 15 spritesheets animadas, geradas em segundos.
         </p>
-        <div className="mt-8 overflow-x-auto thin-scroll rounded-2xl border border-ink-700 bg-ink-900/40 p-4">
+        <div className="pf-shadow thin-scroll mt-8 overflow-x-auto rounded-2xl border border-ink-700 bg-ink-900/40 p-4">
           <div className="grid min-w-[720px] grid-cols-[110px_repeat(5,1fr)] gap-2">
             <div />
             {SHOWCASE_VARS.map((v) => (
-              <div key={v.name} className="rounded-lg bg-gradient-to-r from-forge-500/20 to-pixel-500/20 px-2 py-1.5 text-center font-mono text-[11px] font-bold text-white">
+              <div key={v.name} className="pixel-corners-sm bg-gradient-to-r from-forge-500/20 to-pixel-500/20 px-2 py-1.5 text-center font-mono text-[11px] font-bold text-white">
                 {v.name}
               </div>
             ))}
@@ -254,7 +263,7 @@ export default function Landing() {
           </div>
         </div>
         <div className="mt-6 text-center">
-          <Link to="/projetos" className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-forge-500 to-pixel-500 px-6 py-3 text-sm font-bold text-ink-950 hover:brightness-110">
+          <Link to="/projetos" className="inline-flex items-center gap-2 btn-arcade pixel-corners-sm bg-gradient-to-r from-forge-500 to-pixel-500 px-6 py-3 text-sm font-bold text-ink-950 hover:brightness-110">
             Forjar meu próprio pack <ArrowRight size={16} />
           </Link>
         </div>
@@ -263,7 +272,8 @@ export default function Landing() {
       {/* PLANOS */}
       <section id="planos" className="border-y border-ink-800 bg-ink-900/40 py-16">
         <div className="mx-auto max-w-5xl px-4">
-          <h2 className="text-center font-display text-3xl font-bold text-white">Planos para cada fase do seu jogo</h2>
+          <p className="pf-eyebrow mb-2 text-center text-[10px] text-forge-400">▸ planos</p>
+          <h2 className="text-center font-display text-3xl font-bold text-white drop-shadow-[2px_2px_0_rgba(0,0,0,0.8)]">Planos para cada fase do seu jogo</h2>
           <p className="mt-2 text-center text-sm text-slate-400">Comece grátis. Escale quando o pack crescer.</p>
           <div className="mt-8"><PlanCards /></div>
         </div>
@@ -271,6 +281,7 @@ export default function Landing() {
 
       {/* FAQ */}
       <section className="mx-auto max-w-3xl px-4 py-16">
+        <p className="pf-eyebrow mb-2 text-center text-[10px] text-pixel-400">▸ faq</p>
         <h2 className="text-center font-display text-2xl font-bold text-white">Perguntas frequentes</h2>
         <div className="mt-6 flex flex-col gap-3">
           {[
@@ -280,7 +291,7 @@ export default function Landing() {
             { q: 'Posso usar os assets em jogos comerciais?', a: 'Tudo que você cria (incluindo a partir dos modelos iniciais) é 100% seu, inclusive para uso comercial.' },
             { q: 'Como funcionam os tamanhos de canvas?', a: 'No plano grátis até 32×32px; no Pro e Studio até 64×64px — com export em escala de até 8x sem perda.' },
           ].map((f) => (
-            <details key={f.q} className="group rounded-xl border border-ink-700 bg-ink-900/50 p-4">
+            <details key={f.q} className="pf-shadow-sm group rounded-xl border border-ink-700 bg-ink-900/50 p-4">
               <summary className="cursor-pointer text-sm font-semibold text-white marker:text-forge-400">{f.q}</summary>
               <p className="mt-2 text-sm leading-relaxed text-slate-400">{f.a}</p>
             </details>
@@ -290,11 +301,11 @@ export default function Landing() {
 
       {/* CTA FINAL */}
       <section className="mx-auto max-w-6xl px-4 pb-20">
-        <div className="relative overflow-hidden rounded-3xl border border-ink-600 bg-gradient-to-br from-forge-600/30 via-ink-900 to-pixel-600/20 p-10 text-center">
+        <div className="pf-shadow relative overflow-hidden rounded-3xl border-2 border-ink-600 bg-gradient-to-br from-forge-600/30 via-ink-900 to-pixel-600/20 p-10 text-center">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(142,224,0,0.12),transparent_60%)]" />
           <h2 className="relative font-display text-3xl font-bold text-white">Seu próximo pack está a um clique</h2>
           <p className="relative mx-auto mt-2 max-w-md text-sm text-slate-300">Junte-se a devs e ilustradores criando assets 2D mais rápido — do pixel ao ZIP.</p>
-          <Link to="/projetos" className="relative mt-6 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-forge-500 to-pixel-500 px-8 py-3.5 text-sm font-bold text-ink-950 shadow-glow hover:brightness-110">
+          <Link to="/projetos" className="relative mt-6 inline-flex items-center gap-2 btn-arcade pixel-corners-sm bg-gradient-to-r from-forge-500 to-pixel-500 px-8 py-3.5 text-sm font-bold text-ink-950 shadow-glow hover:brightness-110">
             Criar meu primeiro sprite <ArrowRight size={16} />
           </Link>
         </div>

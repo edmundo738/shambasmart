@@ -132,7 +132,7 @@ export function PlanCards({ compact = false }: { compact?: boolean }) {
 export default function PricingModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-4xl rounded-2xl border border-ink-600 bg-ink-950 p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="cabinet w-full max-w-4xl rounded-2xl bg-ink-950 p-6" onClick={(e) => e.stopPropagation()}>
         <div className="mb-5 flex items-center gap-3">
           <div>
             <h2 className="font-display text-xl font-bold text-white">Planos do PixelForge</h2>

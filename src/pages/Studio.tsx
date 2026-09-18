@@ -15,6 +15,7 @@ import RecipeCard from '../components/studio/RecipeCard';
 import MasterPanel from '../components/studio/MasterPanel';
 import LayersPanel from '../components/studio/LayersPanel';
 import MetaPanel from '../components/studio/MetaPanel';
+import BonesPanel from '../components/studio/BonesPanel';
 import ExportModal from '../components/studio/ExportModal';
 import { TEMPLATES } from '../lib/templates';
 
@@ -133,6 +134,7 @@ export default function Studio() {
         case 'o': st.setTool('ellipse'); break;
         case 'm': st.setTool('select'); break;
         case 't': st.setTool('meta'); break;
+        case 'n': st.setTool('bone'); break;
         case 'p': st.togglePixelPerfect(); break;
         case 'x': st.toggleMirrorX(); break;
         case 'y': st.toggleMirrorY(); break;
@@ -188,7 +190,7 @@ export default function Studio() {
             <span className="bg-pixel-500" /><span className="bg-forge-500" />
             <span className="bg-ember-500" /><span className="bg-[#ff4d6d]" />
           </span>
-          <p className="text-sm text-slate-400">Carregando estúdio…</p>
+          <p className="pf-title text-[10px] text-slate-300">CARREGANDO<span className="animate-blink text-pixel-400">_</span></p>
         </div>
       </div>
     );
@@ -211,7 +213,7 @@ export default function Studio() {
         </div>
 
         {/* painel esquerdo */}
-        <aside className="flex w-full shrink-0 flex-col rounded-xl border border-ink-700 bg-ink-900/50 lg:w-72">
+        <aside className="pf-shadow flex w-full shrink-0 flex-col rounded-xl border border-ink-700 bg-ink-900/50 lg:w-72">
           <div className="flex gap-1 border-b border-ink-700 p-2">
             {tabs.map((t) => (
               <button
@@ -234,9 +236,9 @@ export default function Studio() {
 
         {/* centro: canvas + timeline */}
         <main className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
-          <div className="thin-scroll relative flex min-h-[320px] flex-1 items-center justify-center overflow-auto rounded-xl border border-ink-700 bg-ink-900/30 bg-[radial-gradient(circle_at_50%_40%,rgba(34,184,240,0.07),transparent_60%)] p-6">
+          <div className="cabinet thin-scroll relative flex min-h-[320px] flex-1 items-center justify-center overflow-auto rounded-xl border border-ink-700 bg-ink-900/30 bg-[radial-gradient(circle_at_50%_40%,rgba(34,184,240,0.07),transparent_60%)] p-6">
             <PixelCanvas />
-            <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-ink-600 bg-ink-950/90 px-2 py-1 shadow-xl">
+            <div className="pixel-corners-sm absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1 border-2 border-ink-600 bg-ink-950/90 px-2 py-1 shadow-xl">
               <button onClick={() => setZoom(zoom - 2)} className="rounded-full p-1.5 text-slate-400 hover:bg-ink-800 hover:text-white" title="Reduzir zoom">
                 <ZoomOut size={14} />
               </button>
@@ -245,8 +247,9 @@ export default function Studio() {
                 <ZoomIn size={14} />
               </button>
             </div>
-            <div className="absolute right-3 top-3 hidden rounded-lg border border-ink-700 bg-ink-950/80 px-2.5 py-1.5 font-mono text-[10px] leading-relaxed text-slate-500 xl:block">
-              <div><kbd className="text-slate-300">B E G I M T L R O</kbd> ferramentas</div>
+            <div className="pf-shadow-sm absolute right-3 top-3 hidden rounded-lg border border-ink-700 bg-ink-950/80 px-2.5 py-1.5 font-mono text-[10px] leading-relaxed text-slate-500 xl:block">
+              <div className="pf-eyebrow mb-1 text-[9px] text-forge-400">▸ atalhos</div>
+              <div><kbd className="text-slate-300">B E G I M T N L R O</kbd> ferramentas</div>
               <div><kbd className="text-slate-300">Espaço</kbd> play · <kbd className="text-slate-300">←→</kbd> frames</div>
               <div><kbd className="text-slate-300">Ctrl+C/X/V</kbd> copiar/colar frame</div>
               <div><kbd className="text-slate-300">Ctrl+Z</kbd> desfazer · <kbd className="text-slate-300">Alt+clique</kbd> cor</div>
@@ -259,6 +262,7 @@ export default function Studio() {
         <aside className="thin-scroll flex w-full shrink-0 flex-col gap-3 overflow-y-auto lg:w-80">
           <LayersPanel />
           <MetaPanel />
+          <BonesPanel />
           <PreviewPanel />
           <RecipeCard />
           <MasterPanel />

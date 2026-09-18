@@ -34,7 +34,7 @@ export default function PreviewPanel() {
   const combos = project.animations.length * (project.variations.length + 1);
 
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-ink-700 bg-ink-900/80 p-3">
+    <div className="pf-shadow flex flex-col gap-2 rounded-xl border border-ink-700 bg-ink-900/90 p-3">
       <div className="flex items-center gap-2">
         <Eye size={15} className="text-pixel-400" />
         <span className="text-sm font-semibold text-slate-200">Prévia do jogo</span>

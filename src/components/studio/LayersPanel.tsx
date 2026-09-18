@@ -32,7 +32,7 @@ export default function LayersPanel() {
   const iconBtn = 'flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-ink-700 hover:text-slate-100 disabled:opacity-30';
 
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-ink-700 bg-ink-900/80 p-3">
+    <div className="pf-shadow flex flex-col gap-2 rounded-xl border border-ink-700 bg-ink-900/90 p-3">
       <div className="flex items-center gap-2">
         <span className="text-sm font-semibold text-slate-200">Camadas</span>
         <span className="rounded-full bg-ink-800 px-2 py-0.5 text-[11px] font-medium text-slate-400">

@@ -37,7 +37,7 @@ export default function MetaPanel() {
   );
 
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-ink-700 bg-ink-900/80 p-3">
+    <div className="pf-shadow flex flex-col gap-2 rounded-xl border border-ink-700 bg-ink-900/90 p-3">
       <div className="flex items-center gap-2">
         <Anchor size={15} className="text-amber-300" />
         <span className="text-sm font-semibold text-slate-200">Âncoras e hitbox</span>

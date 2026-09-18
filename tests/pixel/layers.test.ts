@@ -9,7 +9,7 @@ import {
 function proj(layers: Layer[], frames: Record<string, Frame>): ProjectData {
   return {
     id: 'pj', name: 't', width: 4, height: 4, layers, frames,
-    animations: [], variations: [], palette: [], createdAt: 0, updatedAt: 0,
+    animations: [], variations: [], palette: [], rig: [], createdAt: 0, updatedAt: 0,
   };
 }
 

@@ -107,7 +107,7 @@ function BundleCard({ def, onSaved }: { def: BundleDef; onSaved: (n: number) => 
   };
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-ink-700 bg-ink-900/50">
+    <div className="pf-shadow overflow-hidden rounded-2xl border border-ink-700 bg-ink-900/50">
       <button onClick={() => setOpen(!open)} className="flex w-full items-center gap-3 p-4 text-left">
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-forge-500/30 to-pixel-500/30 text-forge-300">
           <Boxes size={20} />
@@ -153,7 +153,7 @@ function BundleCard({ def, onSaved }: { def: BundleDef; onSaved: (n: number) => 
                 ))}
               </div>
               <div className="mt-3 flex gap-2">
-                <button onClick={() => saveAll(false)} disabled={busy} className="flex-1 rounded-xl bg-gradient-to-r from-forge-500 to-pixel-500 px-4 py-2.5 text-sm font-bold text-ink-950 hover:brightness-110 disabled:opacity-50">
+                <button onClick={() => saveAll(false)} disabled={busy} className="flex-1 btn-arcade pixel-corners-sm bg-gradient-to-r from-forge-500 to-pixel-500 px-4 py-2.5 text-sm font-bold text-ink-950 hover:brightness-110 disabled:opacity-50">
                   Salvar os {sprites.length} na Biblioteca
                 </button>
                 <button onClick={() => saveAll(true)} disabled={busy} className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-ink-600 px-4 py-2.5 text-sm font-semibold text-slate-200 hover:border-pixel-500 disabled:opacity-50">
@@ -241,7 +241,7 @@ function VariantModal({ project, onClose, onSaved }: {
           ))}
         </div>
         <div className="flex gap-2 p-4">
-          <button onClick={saveOne} className="flex-1 rounded-xl bg-gradient-to-r from-forge-500 to-pixel-500 px-4 py-2.5 text-sm font-bold text-ink-950 hover:brightness-110">
+          <button onClick={saveOne} className="flex-1 btn-arcade pixel-corners-sm bg-gradient-to-r from-forge-500 to-pixel-500 px-4 py-2.5 text-sm font-bold text-ink-950 hover:brightness-110">
             Salvar “{def.label}”
           </button>
           <button onClick={saveAll} className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-ink-600 px-4 py-2.5 text-sm font-semibold text-slate-200 hover:border-pixel-500">
@@ -322,11 +322,11 @@ export default function Library() {
             <ArrowLeft size={18} />
           </Link>
           <div>
-            <h1 className="font-display text-base font-bold text-white">Biblioteca de Assets</h1>
+            <h1 className="font-display text-base font-bold text-white drop-shadow-[2px_2px_0_rgba(0,0,0,0.8)]">Biblioteca de Assets</h1>
             <p className="text-[11px] text-slate-500">Packs prontos, seus sprites e variações em 1 clique</p>
           </div>
           <div className="flex-1" />
-          <Link to="/gerador" className="flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-forge-500 to-pixel-500 px-3 py-2 text-xs font-bold text-ink-950 hover:brightness-110">
+          <Link to="/gerador" className="btn-arcade pixel-corners-sm flex items-center gap-1.5 bg-gradient-to-r from-forge-500 to-pixel-500 px-3 py-2 text-xs font-bold text-ink-950">
             <Sparkles size={14} /> Novo no Gerador
           </Link>
         </div>
@@ -382,14 +382,14 @@ export default function Library() {
               <p className="text-sm text-slate-500">
                 {fulls.length === 0 ? 'Nenhum asset ainda — monte um pack acima ou crie no Gerador.' : 'Nada aqui com esse filtro.'}
               </p>
-              <Link to="/gerador" className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-forge-500 to-pixel-500 px-4 py-2.5 text-sm font-bold text-ink-950 hover:brightness-110">
+              <Link to="/gerador" className="flex items-center gap-1.5 btn-arcade pixel-corners-sm bg-gradient-to-r from-forge-500 to-pixel-500 px-4 py-2.5 text-sm font-bold text-ink-950 hover:brightness-110">
                 <Sparkles size={15} /> Abrir Gerador
               </Link>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {filtered.map((p) => (
-                <div key={p.id} className="overflow-hidden rounded-2xl border border-ink-700 bg-ink-900/50">
+                <div key={p.id} className="pf-shadow overflow-hidden rounded-2xl border border-ink-700 bg-ink-900/50">
                   <div className="checker flex h-32 items-center justify-center">
                     <AnimThumb project={p} box="h-24 w-24" />
                   </div>

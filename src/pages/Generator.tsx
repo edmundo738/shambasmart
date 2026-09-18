@@ -113,7 +113,7 @@ export default function Generator() {
       layers: [layer],
       frames, animations: anims,
       variations: [{ id: uid('vr'), name: 'sombra', mapping: {}, hue: 0, sat: -10, light: -22 }],
-      palette: sprite.palette, recipe: sprite.recipe, createdAt: now, updatedAt: now,
+      palette: sprite.palette, rig: [], recipe: sprite.recipe, createdAt: now, updatedAt: now,
     };
   };
 
@@ -170,14 +170,14 @@ export default function Generator() {
             <span className="bg-ember-500" /><span className="bg-[#ff4d6d]" />
           </span>
           <div>
-            <h1 className="font-display text-base font-bold text-white">Gerador de Sprites</h1>
+            <h1 className="font-display text-base font-bold text-white drop-shadow-[2px_2px_0_rgba(0,0,0,0.8)]">Gerador de Sprites</h1>
             <p className="text-[11px] text-slate-500">Crie assets para seu jogo sem saber desenhar</p>
           </div>
           <div className="flex-1" />
           <div className="hidden items-center gap-2 sm:flex">
             <span className="font-mono text-xs text-slate-500">seed</span>
             <span className="rounded-lg bg-ink-800 px-3 py-1.5 font-mono text-sm font-bold text-pixel-400">{seed}</span>
-            <button onClick={() => setSeed(randomSeed())} title="Gerar outro" className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-r from-forge-500 to-pixel-500 text-ink-950 hover:brightness-110">
+            <button onClick={() => setSeed(randomSeed())} title="Gerar outro" className="flex h-9 w-9 items-center justify-center btn-arcade rounded-lg bg-gradient-to-r from-forge-500 to-pixel-500 text-ink-950">
               <Dices size={17} />
             </button>
           </div>
@@ -186,7 +186,7 @@ export default function Generator() {
 
       <main className="mx-auto grid max-w-7xl gap-4 px-4 pb-20 pt-6 lg:grid-cols-[300px_1fr_280px]">
         {/* PASSO 1 e 2: o quê + estilo */}
-        <aside className="flex flex-col gap-4 rounded-2xl border border-ink-700 bg-ink-900/50 p-4">
+        <aside className="flex flex-col gap-4 pf-shadow rounded-2xl border border-ink-700 bg-ink-900/50 p-4">
           <div>
             <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">
               1 · O que você quer criar?
@@ -288,7 +288,7 @@ export default function Generator() {
 
         {/* palco */}
         <section className="flex min-w-0 flex-col gap-4">
-          <div className="overflow-hidden rounded-2xl border border-ink-700 bg-ink-900/50">
+          <div className="overflow-hidden pf-shadow rounded-2xl border border-ink-700 bg-ink-900/50">
             <div className="flex items-center gap-2 border-b border-ink-700 bg-ink-900/80 px-4 py-2.5">
               <span className="text-slate-500">{KIND_ICONS[kind]}</span>
               <span className="font-display text-sm font-bold text-white">{sprite.name}</span>
@@ -324,7 +324,7 @@ export default function Generator() {
             )}
           </div>
 
-          <div className="rounded-2xl border border-ink-700 bg-ink-900/50 p-4">
+          <div className="pf-shadow rounded-2xl border border-ink-700 bg-ink-900/50 p-4">
             <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Características</h3>
             <div className="flex flex-wrap gap-1.5">
               {sprite.traits.map((t) => (
@@ -340,7 +340,7 @@ export default function Generator() {
         </section>
 
         {/* PASSO 4: ações + criar */}
-        <aside className="flex flex-col gap-3 rounded-2xl border border-ink-700 bg-ink-900/50 p-4">
+        <aside className="flex flex-col gap-3 pf-shadow rounded-2xl border border-ink-700 bg-ink-900/50 p-4">
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
             4 · Animações do pack ({enabledActions.length})
           </h3>
@@ -379,7 +379,7 @@ export default function Generator() {
 
           {notice && <div className="rounded-xl border border-pixel-500/40 bg-pixel-500/10 p-3 text-xs text-pixel-400">{notice}</div>}
 
-          <button onClick={createInStudio} className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-forge-500 to-pixel-500 px-4 py-3.5 text-sm font-bold text-ink-950 hover:brightness-110">
+          <button onClick={createInStudio} className="flex items-center justify-center gap-2 btn-arcade pixel-corners-sm bg-gradient-to-r from-forge-500 to-pixel-500 px-4 py-3.5 text-sm font-bold text-ink-950 hover:brightness-110">
             <Send size={16} /> Criar no Studio
           </button>
           <button

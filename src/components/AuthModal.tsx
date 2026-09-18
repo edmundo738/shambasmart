@@ -18,7 +18,7 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-sm rounded-2xl border border-ink-600 bg-ink-900 p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="cabinet w-full max-w-sm rounded-2xl bg-ink-900 p-6" onClick={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-forge-500 to-pixel-500 text-ink-950">
             <Gamepad2 size={20} />
@@ -53,7 +53,7 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
               E-mail
               <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="voce@studio.com" type="email" required className="mt-1 w-full rounded-lg border border-ink-700 bg-ink-950 px-3 py-2.5 text-sm text-white placeholder:text-slate-600" />
             </label>
-            <button type="submit" className="rounded-xl bg-gradient-to-r from-forge-500 to-pixel-500 py-3 text-sm font-bold text-ink-950 hover:brightness-110">
+            <button type="submit" className="btn-arcade pixel-corners-sm bg-gradient-to-r from-forge-500 to-pixel-500 py-3 text-sm font-bold text-ink-950 hover:brightness-110">
               Criar conta grátis
             </button>
             <p className="text-center text-[11px] text-slate-500">MVP: a conta fica salva neste navegador. Sem senha, sem spam.</p>

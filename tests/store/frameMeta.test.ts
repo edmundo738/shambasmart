@@ -15,7 +15,7 @@ function fixture(): ProjectData {
     layers: [layer], frames: { [f.id]: f },
     animations: [{ id: 'an', name: 'idle', fps: 8, frameIds: [f.id], playMode: 'loop' }],
     variations: [], palette: [],
-    createdAt: 0, updatedAt: 0,
+    rig: [], createdAt: 0, updatedAt: 0,
   };
 }
 

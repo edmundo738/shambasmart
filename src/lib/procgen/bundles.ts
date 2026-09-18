@@ -108,6 +108,7 @@ export function spriteToProjectData(sprite: GeneratedSprite, size: number, bundl
     animations: anims,
     variations: [{ id: uid('vr'), name: 'sombra', mapping: {}, hue: 0, sat: -10, light: -22 }],
     palette: sprite.palette,
+    rig: [],
     recipe: sprite.recipe,
     bundle,
     createdAt: now,

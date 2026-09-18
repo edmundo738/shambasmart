@@ -15,6 +15,7 @@ import {
 } from '../../lib/pixels';
 import { compositeStack, flattenCells } from '../../lib/layers';
 import { pickAnchor, pointInHitbox } from '../../lib/frameMeta';
+import { angleTo, distToSegment, normalizeDeg, snapWorldBone, solveFK, worldToLocal, WorldBone } from '../../lib/fk';
 
 export default function PixelCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -23,9 +24,9 @@ export default function PixelCanvas() {
     drawing: boolean; startX: number; startY: number; erase: boolean;
     lastX: number; lastY: number; lastKey: string;
     trail: Array<[number, number]>; orig: string[] | null;
-    mode: 'paint' | 'shape' | 'marquee' | 'move' | 'anchor' | 'hitbox' | 'metadraw';
+    mode: 'paint' | 'shape' | 'marquee' | 'move' | 'anchor' | 'hitbox' | 'metadraw' | 'bonepose' | 'bonerot';
     moved: boolean; base: SelRect | null;
-    anchorId: string | null; hbDX: number; hbDY: number; hbResize: boolean;
+    anchorId: string | null; hbDX: number; hbDY: number; hbResize: boolean; boneId: string | null;
   } | null>(null);
 
   const project = useStudio((s) => s.project);
@@ -46,6 +47,8 @@ export default function PixelCanvas() {
   const zoom = useStudio((s) => s.zoom);
   const selection = useStudio((s) => s.selection);
   const showMeta = useStudio((s) => s.showMeta);
+  const showRig = useStudio((s) => s.showRig);
+  const selectedBoneId = useStudio((s) => s.selectedBoneId);
 
   const anim = project?.animations.find((a) => a.id === currentAnimationId) ?? project?.animations[0];
   const frame = currentFrameId ? project?.frames[currentFrameId] : undefined;
@@ -311,10 +314,60 @@ export default function PixelCanvas() {
     }
   }, []);
 
+  /** Esqueleto-guia pixel-snapped + poses-fantasma dos vizinhos (tintas do onion). */
+  const drawRig = useCallback(() => {
+    const overlay = overlayRef.current;
+    const st = useStudio.getState();
+    const pr = st.project;
+    const f = st.currentFrameId ? pr?.frames[st.currentFrameId] : undefined;
+    const rig = pr?.rig ?? [];
+    if (!overlay || !pr || !f || !st.showRig || !rig.length) return;
+    if (!overlay.width) {
+      overlay.width = pr.width * st.zoom;
+      overlay.height = pr.height * st.zoom;
+    }
+    const ctx = overlay.getContext('2d')!;
+    const z = st.zoom;
+    const paint = (pose: typeof f.pose, color: string, joint: string, alpha: number, selectedId: string | null) => {
+      const world = solveFK(rig, pose).map(snapWorldBone);
+      ctx.globalAlpha = alpha;
+      for (const w of world) {
+        const sel = selectedId === w.id;
+        ctx.fillStyle = sel ? '#ff8a00' : color;
+        for (const [lx, ly] of linePoints(w.jx, w.jy, w.tipX, w.tipY)) {
+          ctx.fillRect(lx * z, ly * z, z, z);
+        }
+        ctx.fillStyle = sel ? '#ff8a00' : joint;
+        const s = Math.max(3, Math.round(z * 0.3));
+        ctx.fillRect((w.jx + 0.5) * z - s / 2, (w.jy + 0.5) * z - s / 2, s, s);
+      }
+      ctx.globalAlpha = 1;
+    };
+    const anim = pr.animations.find((a) => a.id === (st.currentAnimationId ?? pr.animations[0]?.id));
+    if (anim && st.onionSkin) {
+      const idx = anim.frameIds.indexOf(st.currentFrameId ?? '');
+      const base = st.onionOpacity / 100;
+      for (let k = 1; k <= st.onionPrev; k++) {
+        const gf = idx - k >= 0 ? pr.frames[anim.frameIds[idx - k]] : undefined;
+        if (gf && gf.pose && gf.id !== f.id) {
+          paint(gf.pose, st.onionTintPrev, st.onionTintPrev, base * ((st.onionPrev - k + 1) / st.onionPrev), null);
+        }
+      }
+      for (let k = 1; k <= st.onionNext; k++) {
+        const gf = idx + k < anim.frameIds.length ? pr.frames[anim.frameIds[idx + k]] : undefined;
+        if (gf && gf.pose && gf.id !== f.id) {
+          paint(gf.pose, st.onionTintNext, st.onionTintNext, base * ((st.onionNext - k + 1) / st.onionNext), null);
+        }
+      }
+    }
+    paint(f.pose, '#22d3ee', '#ffffff', 1, st.selectedBoneId);
+  }, []);
+
   const drawDecor = useCallback(() => {
     drawAnts(0);
     drawMeta();
-  }, [drawAnts, drawMeta]);
+    drawRig();
+  }, [drawAnts, drawMeta, drawRig]);
 
   /* Overlay: ants (+ meta) estáticas sempre; ants animadas com a ferramenta select. */
   useEffect(() => {
@@ -328,20 +381,20 @@ export default function PixelCanvas() {
     drawDecor();
     if (tool !== 'select') return;
     let off = 0;
-    const t = setInterval(() => { off = (off + 2) % 16; drawAnts(off); drawMeta(); }, 120);
+    const t = setInterval(() => { off = (off + 2) % 16; drawAnts(off); drawMeta(); drawRig(); }, 120);
     return () => clearInterval(t);
-  }, [selection, zoom, tool, frame, showMeta, clearOverlay, drawAnts, drawMeta, drawDecor]);
+  }, [selection, zoom, tool, frame, showMeta, showRig, selectedBoneId, clearOverlay, drawAnts, drawMeta, drawRig, drawDecor]);
 
   /* Esc durante marquee/arrasto: cancela (arrasto reverte pixels + retângulo). */
   useEffect(() => {
     const onEsc = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       const d = drag.current;
-      if (!d || (d.mode !== 'move' && d.mode !== 'marquee' && d.mode !== 'anchor' && d.mode !== 'hitbox' && d.mode !== 'metadraw')) return;
+      if (!d || (d.mode !== 'move' && d.mode !== 'marquee' && d.mode !== 'anchor' && d.mode !== 'hitbox' && d.mode !== 'metadraw' && d.mode !== 'bonepose' && d.mode !== 'bonerot')) return;
       e.preventDefault();
       e.stopPropagation();
       const st = useStudio.getState();
-      if ((d.mode === 'move' || d.mode === 'anchor' || d.mode === 'hitbox') && d.moved) st.undo();
+      if ((d.mode === 'move' || d.mode === 'anchor' || d.mode === 'hitbox' || d.mode === 'bonepose' || d.mode === 'bonerot') && d.moved) st.undo();
       if (d.mode === 'move') st.setSelection(d.base ? { ...d.base } : null);
       else if (d.mode === 'marquee') st.setSelection(null);
       drag.current = null;
@@ -375,13 +428,13 @@ export default function PixelCanvas() {
         st.beginStroke(); // baseline: arrasto inteiro = 1 undo
         drag.current = {
           drawing: true, startX: x, startY: y, erase: false, lastX: x, lastY: y,
-          lastKey: '', trail: [], orig: null, mode: 'move', moved: false, base: { ...sel }, anchorId: null, hbDX: 0, hbDY: 0, hbResize: false,
+          lastKey: '', trail: [], orig: null, mode: 'move', moved: false, base: { ...sel }, anchorId: null, hbDX: 0, hbDY: 0, hbResize: false, boneId: null,
         };
       } else {
         st.setSelection(null);
         drag.current = {
           drawing: true, startX: x, startY: y, erase: false, lastX: x, lastY: y,
-          lastKey: '', trail: [], orig: null, mode: 'marquee', moved: false, base: null, anchorId: null, hbDX: 0, hbDY: 0, hbResize: false,
+          lastKey: '', trail: [], orig: null, mode: 'marquee', moved: false, base: null, anchorId: null, hbDX: 0, hbDY: 0, hbResize: false, boneId: null,
         };
       }
       return;
@@ -394,7 +447,7 @@ export default function PixelCanvas() {
         drag.current = {
           drawing: true, startX: x, startY: y, erase: false, lastX: x, lastY: y,
           lastKey: '', trail: [], orig: null, mode: 'anchor', moved: false, base: null,
-          anchorId: hit.id, hbDX: 0, hbDY: 0, hbResize: false,
+          anchorId: hit.id, hbDX: 0, hbDY: 0, hbResize: false, boneId: null,
         };
         return;
       }
@@ -404,7 +457,7 @@ export default function PixelCanvas() {
         drag.current = {
           drawing: true, startX: x, startY: y, erase: false, lastX: x, lastY: y,
           lastKey: '', trail: [], orig: null, mode: 'hitbox', moved: false, base: null,
-          anchorId: null, hbDX: 0, hbDY: 0, hbResize: true,
+          anchorId: null, hbDX: 0, hbDY: 0, hbResize: true, boneId: null,
         };
         return;
       }
@@ -413,7 +466,7 @@ export default function PixelCanvas() {
         drag.current = {
           drawing: true, startX: x, startY: y, erase: false, lastX: x, lastY: y,
           lastKey: '', trail: [], orig: null, mode: 'hitbox', moved: false, base: null,
-          anchorId: null, hbDX: x - hb.x, hbDY: y - hb.y, hbResize: false,
+          anchorId: null, hbDX: x - hb.x, hbDY: y - hb.y, hbResize: false, boneId: null,
         };
         return;
       }
@@ -421,8 +474,49 @@ export default function PixelCanvas() {
       drag.current = {
         drawing: true, startX: x, startY: y, erase: false, lastX: x, lastY: y,
         lastKey: '', trail: [], orig: null, mode: 'metadraw', moved: false, base: null,
-        anchorId: null, hbDX: 0, hbDY: 0, hbResize: false,
+        anchorId: null, hbDX: 0, hbDY: 0, hbResize: false, boneId: null,
       };
+      return;
+    }
+
+    if (st.tool === 'bone') {
+      const rig = project.rig ?? [];
+      const world = solveFK(rig, frame.pose);
+      let joint: WorldBone | null = null;
+      let best = 2.001;
+      for (const w of world) {
+        const d = Math.hypot(w.jx - x, w.jy - y);
+        if (d <= 2 && d < best) { joint = w; best = d; }
+      }
+      if (joint) {
+        st.selectBone(joint.id);
+        st.beginStroke();
+        drag.current = {
+          drawing: true, startX: x, startY: y, erase: false, lastX: x, lastY: y,
+          lastKey: '', trail: [], orig: null, mode: 'bonepose', moved: false, base: null,
+          anchorId: null, hbDX: 0, hbDY: 0, hbResize: false, boneId: joint.id,
+        };
+        return;
+      }
+      let body: WorldBone | null = null;
+      let bestB = 1.6;
+      for (const w of world) {
+        const d = distToSegment(x, y, w.jx, w.jy, w.tipX, w.tipY);
+        if (d < bestB) { body = w; bestB = d; }
+      }
+      if (body) {
+        st.selectBone(body.id);
+        st.beginStroke();
+        drag.current = {
+          drawing: true, startX: x, startY: y, erase: false, lastX: x, lastY: y,
+          lastKey: '', trail: [], orig: null, mode: 'bonerot', moved: false, base: null,
+          anchorId: null, hbDX: 0, hbDY: 0, hbResize: false, boneId: body.id,
+        };
+        return;
+      }
+      // vazio: cria osso (filho do selecionado ou raiz) no ponto
+      const sel = st.selectedBoneId && rig.some((b) => b.id === st.selectedBoneId) ? st.selectedBoneId : null;
+      st.addBone(sel, { x, y });
       return;
     }
 
@@ -442,14 +536,14 @@ export default function PixelCanvas() {
     }
 
     if (st.tool === 'line' || st.tool === 'rect' || st.tool === 'ellipse') {
-      drag.current = { drawing: true, startX: x, startY: y, erase, lastX: x, lastY: y, lastKey: '', trail: [], orig: null, mode: 'shape', moved: false, base: null, anchorId: null, hbDX: 0, hbDY: 0, hbResize: false };
+      drag.current = { drawing: true, startX: x, startY: y, erase, lastX: x, lastY: y, lastKey: '', trail: [], orig: null, mode: 'shape', moved: false, base: null, anchorId: null, hbDX: 0, hbDY: 0, hbResize: false, boneId: null };
       drawOverlayShape(x, y, e.shiftKey);
       return;
     }
 
     st.beginStroke();
     // snapshot grátis: paint() é imutável, então a referência congela o pré-traço
-    drag.current = { drawing: true, startX: x, startY: y, erase, lastX: x, lastY: y, lastKey: '', trail: [], orig: cel, mode: 'paint', moved: false, base: null, anchorId: null, hbDX: 0, hbDY: 0, hbResize: false };
+    drag.current = { drawing: true, startX: x, startY: y, erase, lastX: x, lastY: y, lastKey: '', trail: [], orig: cel, mode: 'paint', moved: false, base: null, anchorId: null, hbDX: 0, hbDY: 0, hbResize: false, boneId: null };
     applyStrokeTo(x, y, erase);
   };
 
@@ -460,6 +554,30 @@ export default function PixelCanvas() {
     if (!cell) return;
     const st = useStudio.getState();
     const [x, y] = cell;
+    if (d.mode === 'bonepose' && d.boneId) {
+      const pr = st.project;
+      const bone = pr?.rig.find((b) => b.id === d.boneId);
+      if (pr && bone) {
+        const f = pr.frames[st.currentFrameId ?? ''];
+        st.poseBoneLive(d.boneId, worldToLocal(pr.rig, f?.pose, bone.parentId, x, y));
+        d.moved = true;
+      }
+      return;
+    }
+    if (d.mode === 'bonerot' && d.boneId) {
+      const pr = st.project;
+      if (pr) {
+        const f = pr.frames[st.currentFrameId ?? ''];
+        const world = solveFK(pr.rig, f?.pose);
+        const w = world.find((b) => b.id === d.boneId);
+        if (w) {
+          const parentRot = w.parentId ? world.find((q) => q.id === w.parentId)?.worldRot ?? 0 : 0;
+          st.poseBoneLive(d.boneId, { rotation: normalizeDeg(angleTo(w.jx, w.jy, x, y) - parentRot) });
+          d.moved = true;
+        }
+      }
+      return;
+    }
     if (d.mode === 'anchor' && d.anchorId) {
       st.moveAnchorLive(d.anchorId, x, y);
       d.lastX = x; d.lastY = y; d.moved = true;
@@ -505,7 +623,7 @@ export default function PixelCanvas() {
     if (!d?.drawing) return;
     drag.current = null;
     const st = useStudio.getState();
-    if (d.mode === 'anchor' || d.mode === 'hitbox') return; // undo único via beginStroke
+    if (d.mode === 'anchor' || d.mode === 'hitbox' || d.mode === 'bonepose' || d.mode === 'bonerot') return; // undo único via beginStroke
     if (d.mode === 'metadraw') {
       const cell = cellFromEvent(e);
       clearOverlay();

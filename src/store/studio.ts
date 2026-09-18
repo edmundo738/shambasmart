@@ -1,11 +1,12 @@
 import { create } from 'zustand';
 import {
-  Animation, Frame, FrameAnchor, FrameHitbox, Layer, ORIGINAL_VARIATION_ID, PlayMode, ProjectData, SelRect,
-  ToolId, Variation, uid,
+  Animation, Bone, BonePose, Frame, FrameAnchor, FrameHitbox, FramePose, Layer, ORIGINAL_VARIATION_ID, PlayMode,
+  ProjectData, SelRect, ToolId, Variation, uid,
 } from '../types';
 import { emptyCells, moveRect } from '../lib/pixels';
 import { clampMs, fpsToMs, frameMs, moveIdTo } from '../lib/timeline';
 import { clampAnchor, cloneFrameMeta, normalizeHitbox, opaqueBBox } from '../lib/frameMeta';
+import { clonePose, normalizeDeg, solveFK, worldToLocal, wouldCycle } from '../lib/fk';
 import { createLayer, flattenCells, makeFrame, migrateProject } from '../lib/layers';
 import { normalizeHex } from '../lib/color';
 import { TEMPLATES } from '../lib/templates';
@@ -16,6 +17,7 @@ interface HistorySnap {
   layers: Layer[];
   palette: string[];
   variations: Variation[];
+  rig: Bone[];
 }
 
 function snap(project: ProjectData): HistorySnap {
@@ -25,6 +27,7 @@ function snap(project: ProjectData): HistorySnap {
     layers: JSON.parse(JSON.stringify(project.layers)),
     palette: [...project.palette],
     variations: JSON.parse(JSON.stringify(project.variations)),
+    rig: JSON.parse(JSON.stringify(project.rig ?? [])),
   };
 }
 
@@ -42,6 +45,9 @@ function restorePalette(s: HistorySnap): string[] {
 }
 function restoreVariations(s: HistorySnap): Variation[] {
   return JSON.parse(JSON.stringify(s.variations));
+}
+function restoreRig(s: HistorySnap): Bone[] {
+  return JSON.parse(JSON.stringify(s.rig ?? []));
 }
 
 interface StudioState {
@@ -143,6 +149,24 @@ interface StudioState {
   autoFitHitbox: () => void;
   showMeta: boolean;
   toggleShowMeta: () => void;
+
+  // esqueleto (rig) + poses
+  addBone: (parentId?: string | null, at?: { x: number; y: number }) => string;
+  renameBone: (id: string, name: string) => void;
+  deleteBone: (id: string) => void;
+  setBoneParent: (id: string, parentId: string | null) => void;
+  setBoneRest: (id: string, patch: Partial<{ x: number; y: number; rotation: number; length: number }>) => void;
+  poseBone: (id: string, patch: Partial<BonePose>) => void;
+  poseBoneLive: (id: string, patch: Partial<BonePose>) => void;
+  poseToRest: (id: string) => void;
+  resetPose: () => void;
+  copyPose: () => void;
+  pastePose: () => void;
+  poseClipboard: FramePose | null;
+  selectedBoneId: string | null;
+  selectBone: (id: string | null) => void;
+  showRig: boolean;
+  toggleShowRig: () => void;
   clearFrame: (id: string) => void;
 
   // animações
@@ -212,7 +236,7 @@ function applyMove(
 
 function patchFrameMeta(
   project: ProjectData, frameId: string,
-  patch: { anchors?: FrameAnchor[]; hitbox?: FrameHitbox | null },
+  patch: { anchors?: FrameAnchor[]; hitbox?: FrameHitbox | null; pose?: FramePose },
   hist: Partial<StudioState>,
 ): Partial<StudioState> {
   const frame = project.frames[frameId];
@@ -226,6 +250,31 @@ function patchFrameMeta(
     },
     dirty: true,
   };
+}
+
+function patchPose(
+  project: ProjectData, frameId: string, boneId: string, patch: Partial<BonePose>,
+  hist: Partial<StudioState>,
+): Partial<StudioState> {
+  const frame = project.frames[frameId];
+  const bone = (project.rig ?? []).find((b) => b.id === boneId);
+  if (!frame || !bone) return {};
+  const cur = frame.pose?.[boneId] ?? { x: bone.x, y: bone.y, rotation: bone.rotation };
+  const r2 = (v: number) => Math.round(v * 100) / 100;
+  const next: BonePose = {
+    x: patch.x !== undefined && Number.isFinite(patch.x) ? r2(patch.x) : cur.x,
+    y: patch.y !== undefined && Number.isFinite(patch.y) ? r2(patch.y) : cur.y,
+    rotation: patch.rotation !== undefined && Number.isFinite(patch.rotation)
+      ? normalizeDeg(patch.rotation) : cur.rotation,
+  };
+  const isRest = next.x === bone.x && next.y === bone.y && normalizeDeg(next.rotation) === normalizeDeg(bone.rotation);
+  const had = frame.pose?.[boneId];
+  if (isRest && !had) return {};
+  if (had && had.x === next.x && had.y === next.y && had.rotation === next.rotation) return {};
+  const pose = { ...(frame.pose ?? {}) };
+  if (isRest) delete pose[boneId];
+  else pose[boneId] = next;
+  return patchFrameMeta(project, frameId, { pose }, hist);
 }
 
 function currentAnim(project: ProjectData, animId: string | null): Animation | undefined {
@@ -268,6 +317,9 @@ export const useStudio = create<StudioState>((set, get) => ({
   onionTintPrev: '#ff4d6d',
   onionTintNext: '#22b8f0',
   showMeta: true,
+  poseClipboard: null,
+  selectedBoneId: null,
+  showRig: true,
   zoom: 12,
   playing: true,
   currentAnimationId: null,
@@ -289,6 +341,8 @@ export const useStudio = create<StudioState>((set, get) => ({
     currentLayerId: project.layers[project.layers.length - 1]?.id ?? null,
     selection: null,
     frameClipboard: null,
+    poseClipboard: null,
+    selectedBoneId: null,
     variationId: ORIGINAL_VARIATION_ID,
     past: [],
     future: [],
@@ -309,6 +363,7 @@ export const useStudio = create<StudioState>((set, get) => ({
       animations: [anim],
       variations: [],
       palette: ['#10131d', '#ffffff', '#ff4d6d', '#ff8a00', '#ffd23f', '#8ee000', '#3fd65f', '#22b8f0'],
+      rig: [],
       createdAt: now, updatedAt: now,
     };
     get().loadProject(project);
@@ -325,6 +380,7 @@ export const useStudio = create<StudioState>((set, get) => ({
       animations: built.animations,
       variations: [],
       palette: built.palette,
+      rig: [],
       createdAt: now, updatedAt: now,
     };
     get().loadProject(project);
@@ -344,6 +400,8 @@ export const useStudio = create<StudioState>((set, get) => ({
   toggleGrid: () => set((s) => ({ showGrid: !s.showGrid })),
   toggleOnion: () => set((s) => ({ onionSkin: !s.onionSkin })),
   toggleShowMeta: () => set((s) => ({ showMeta: !s.showMeta })),
+  selectBone: (id) => set({ selectedBoneId: id }),
+  toggleShowRig: () => set((s) => ({ showRig: !s.showRig })),
   setOnionPrev: (n) => set({ onionPrev: Math.max(0, Math.min(3, Math.round(n))) }),
   setOnionNext: (n) => set({ onionNext: Math.max(0, Math.min(3, Math.round(n))) }),
   setOnionOpacity: (n) => set({ onionOpacity: Math.max(5, Math.min(80, Math.round(n))) }),
@@ -579,7 +637,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     const src = s.project.frames[id];
     if (!anim || !src || !anim.frameIds.includes(id)) return {};
     const hist = pushHistory(s);
-    const frame: Frame = { id: uid('fr'), cels: cloneCels(src, s.project), durationMs: frameMs(src), ...cloneFrameMeta(src) };
+    const frame: Frame = { id: uid('fr'), cels: cloneCels(src, s.project), durationMs: frameMs(src), ...cloneFrameMeta(src), pose: clonePose(src.pose) };
     const frameIds = [...anim.frameIds];
     frameIds.splice(frameIds.indexOf(id) + 1, 0, frame.id);
     const animations = s.project.animations.map((a) => (a.id === anim.id ? { ...a, frameIds } : a));
@@ -695,7 +753,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     const frameIds = [...anim.frameIds];
     const curIdx = s.currentFrameId ? frameIds.indexOf(s.currentFrameId) : frameIds.length - 1;
     const pasted = s.frameClipboard.map((f) => {
-      const copy: Frame = { id: uid('fr'), cels: cloneCels(f, s.project!), durationMs: frameMs(f), ...cloneFrameMeta(f) };
+      const copy: Frame = { id: uid('fr'), cels: cloneCels(f, s.project!), durationMs: frameMs(f), ...cloneFrameMeta(f), pose: clonePose(f?.pose) };
       frames[copy.id] = copy;
       return copy.id;
     });
@@ -799,6 +857,186 @@ export const useStudio = create<StudioState>((set, get) => ({
     return patchFrameMeta(s.project, frame.id, { hitbox: box }, pushHistory(s));
   }),
 
+  addBone: (parentId = null, at) => {
+    const s = get();
+    if (!s.project) return '';
+    const rig = s.project.rig ?? [];
+    const px = at?.x ?? Math.floor(s.project.width / 2);
+    const py = at?.y ?? Math.floor(s.project.height / 2);
+    const world = solveFK(rig, undefined);
+    const pj = parentId ? world.find((w) => w.id === parentId) : undefined;
+    const local = worldToLocal(rig, undefined, pj ? parentId : null, px, py);
+    const len = pj
+      ? Math.min(128, Math.max(2, Math.round(Math.hypot(px - pj.jx, py - pj.jy))))
+      : 12;
+    const bone: Bone = {
+      id: uid('bn'), name: `osso_${rig.length + 1}`,
+      parentId: pj && parentId ? parentId : null,
+      x: local.x, y: local.y, rotation: 0, length: len,
+    };
+    set({
+      ...pushHistory(s),
+      project: { ...s.project, rig: [...rig, bone], updatedAt: Date.now() },
+      selectedBoneId: bone.id,
+    });
+    return bone.id;
+  },
+
+  renameBone: (id, name) => set((s) => {
+    if (!s.project || !name.trim()) return {};
+    const rig = s.project.rig ?? [];
+    if (!rig.some((b) => b.id === id)) return {};
+    const hist = pushHistory(s);
+    return {
+      ...hist,
+      project: {
+        ...s.project,
+        rig: rig.map((b) => (b.id === id ? { ...b, name: name.trim().slice(0, 24) } : b)),
+        updatedAt: Date.now(),
+      },
+    };
+  }),
+
+  deleteBone: (id) => set((s) => {
+    if (!s.project) return {};
+    const rig = s.project.rig ?? [];
+    const dead = rig.find((b) => b.id === id);
+    if (!dead) return {};
+    const hist = pushHistory(s);
+    const next = rig.filter((b) => b.id !== id)
+      .map((b) => (b.parentId === id ? { ...b, parentId: dead.parentId } : b));
+    const frames = { ...s.project.frames };
+    for (const [fid, f] of Object.entries(frames)) {
+      if (f.pose && f.pose[id]) {
+        const pose = { ...f.pose };
+        delete pose[id];
+        frames[fid] = { ...f, pose };
+      }
+    }
+    return {
+      ...hist,
+      project: { ...s.project, rig: next, frames, updatedAt: Date.now() },
+      selectedBoneId: s.selectedBoneId === id ? null : s.selectedBoneId,
+    };
+  }),
+
+  setBoneParent: (id, parentId) => set((s) => {
+    if (!s.project) return {};
+    const rig = s.project.rig ?? [];
+    const bone = rig.find((b) => b.id === id);
+    if (!bone || bone.parentId === parentId) return {};
+    if (parentId && !rig.some((b) => b.id === parentId)) return {};
+    if (wouldCycle(rig, id, parentId)) return {};
+    const hist = pushHistory(s);
+    return {
+      ...hist,
+      project: {
+        ...s.project,
+        rig: rig.map((b) => (b.id === id ? { ...b, parentId } : b)),
+        updatedAt: Date.now(),
+      },
+    };
+  }),
+
+  setBoneRest: (id, patch) => set((s) => {
+    if (!s.project) return {};
+    const rig = s.project.rig ?? [];
+    const bone = rig.find((b) => b.id === id);
+    if (!bone) return {};
+    const r2 = (v: number) => Math.round(v * 100) / 100;
+    const next: Bone = {
+      ...bone,
+      x: patch.x !== undefined && Number.isFinite(patch.x) ? r2(patch.x) : bone.x,
+      y: patch.y !== undefined && Number.isFinite(patch.y) ? r2(patch.y) : bone.y,
+      rotation: patch.rotation !== undefined && Number.isFinite(patch.rotation)
+        ? normalizeDeg(patch.rotation) : bone.rotation,
+      length: patch.length !== undefined && Number.isFinite(patch.length)
+        ? Math.min(512, Math.max(0, r2(patch.length))) : bone.length,
+    };
+    if (next.x === bone.x && next.y === bone.y && next.rotation === bone.rotation && next.length === bone.length) return {};
+    const hist = pushHistory(s);
+    return {
+      ...hist,
+      project: {
+        ...s.project,
+        rig: rig.map((b) => (b.id === id ? next : b)),
+        updatedAt: Date.now(),
+      },
+    };
+  }),
+
+  poseBone: (id, patch) => set((s) => {
+    if (!s.project) return {};
+    return patchPose(s.project, s.currentFrameId ?? '', id, patch, pushHistory(s));
+  }),
+
+  poseBoneLive: (id, patch) => set((s) => {
+    if (!s.project) return {};
+    return patchPose(s.project, s.currentFrameId ?? '', id, patch, {});
+  }),
+
+  poseToRest: (id) => set((s) => {
+    if (!s.project) return {};
+    const bone = (s.project.rig ?? []).find((b) => b.id === id);
+    const frame = s.project.frames[s.currentFrameId ?? ''];
+    if (!bone || !frame) return {};
+    const eff = frame.pose?.[id] ?? { x: bone.x, y: bone.y, rotation: bone.rotation };
+    if (eff.x === bone.x && eff.y === bone.y && eff.rotation === bone.rotation && !frame.pose?.[id]) return {};
+    const hist = pushHistory(s);
+    const rig = (s.project.rig ?? []).map((b) => (
+      b.id === id ? { ...b, x: eff.x, y: eff.y, rotation: eff.rotation } : b
+    ));
+    const pose = { ...(frame.pose ?? {}) };
+    delete pose[id];
+    return {
+      ...hist,
+      project: {
+        ...s.project, rig,
+        frames: { ...s.project.frames, [frame.id]: { ...frame, pose } },
+        updatedAt: Date.now(),
+      },
+    };
+  }),
+
+  resetPose: () => set((s) => {
+    if (!s.project) return {};
+    const frame = s.project.frames[s.currentFrameId ?? ''];
+    if (!frame || !frame.pose || !Object.keys(frame.pose).length) return {};
+    const hist = pushHistory(s);
+    const { pose: _drop, ...rest } = frame;
+    void _drop;
+    return {
+      ...hist,
+      project: {
+        ...s.project,
+        frames: { ...s.project.frames, [frame.id]: rest },
+        updatedAt: Date.now(),
+      },
+    };
+  }),
+
+  copyPose: () => set((s) => {
+    const f = s.project?.frames[s.currentFrameId ?? ''];
+    return { poseClipboard: clonePose(f?.pose) ?? null };
+  }),
+
+  pastePose: () => set((s) => {
+    if (!s.project || !s.poseClipboard) return {};
+    const frame = s.project.frames[s.currentFrameId ?? ''];
+    if (!frame) return {};
+    const next = clonePose(s.poseClipboard) ?? {};
+    if (JSON.stringify(frame.pose ?? {}) === JSON.stringify(next)) return {};
+    const hist = pushHistory(s);
+    return {
+      ...hist,
+      project: {
+        ...s.project,
+        frames: { ...s.project.frames, [frame.id]: { ...frame, pose: next } },
+        updatedAt: Date.now(),
+      },
+    };
+  }),
+
   clearFrame: (id) => set((s) => {
     if (!s.project || !s.project.frames[id]) return {};
     const layer = currentLayer(s.project, s.currentLayerId);
@@ -873,7 +1111,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     const frames = { ...s.project.frames };
     const frameIds = src.frameIds.map((fid) => {
       const f = frames[fid];
-      const copy: Frame = { id: uid('fr'), cels: cloneCels(f, s.project!), durationMs: frameMs(f), ...cloneFrameMeta(f) };
+      const copy: Frame = { id: uid('fr'), cels: cloneCels(f, s.project!), durationMs: frameMs(f), ...cloneFrameMeta(f), pose: clonePose(f?.pose) };
       frames[copy.id] = copy;
       return copy.id;
     });
@@ -1056,6 +1294,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     const layers = restoreLayers(prev);
     const palette = restorePalette(prev);
     const variations = restoreVariations(prev);
+    const rig = restoreRig(prev);
     // revalida seleção
     let { currentAnimationId, currentFrameId } = s;
     if (!animations.some((a) => a.id === currentAnimationId)) {
@@ -1073,7 +1312,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     }
     return {
       past, future,
-      project: { ...s.project, frames, animations, layers, palette, variations, updatedAt: Date.now() },
+      project: { ...s.project, frames, animations, layers, palette, variations, rig, updatedAt: Date.now() },
       currentAnimationId, currentFrameId, currentLayerId, dirty: true,
     };
   }),
@@ -1087,6 +1326,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     const layers = restoreLayers(next);
     const palette = restorePalette(next);
     const variations = restoreVariations(next);
+    const rig = restoreRig(next);
     let { currentAnimationId, currentFrameId } = s;
     if (!animations.some((a) => a.id === currentAnimationId)) {
       currentAnimationId = animations[0]?.id ?? null;
@@ -1103,7 +1343,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     }
     return {
       past, future,
-      project: { ...s.project, frames, animations, layers, palette, variations, updatedAt: Date.now() },
+      project: { ...s.project, frames, animations, layers, palette, variations, rig, updatedAt: Date.now() },
       currentAnimationId, currentFrameId, currentLayerId, dirty: true,
     };
   }),

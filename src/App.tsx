@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { applyCrt, isCrtOn } from './components/CrtToggle';
 import Landing from './pages/Landing';
 import Studio from './pages/Studio';
 import Projects from './pages/Projects';
@@ -7,8 +9,13 @@ import Generator from './pages/Generator';
 import Library from './pages/Library';
 
 export default function App() {
+  useEffect(() => {
+    applyCrt(isCrtOn());
+  }, []);
   return (
-    <Routes>
+    <>
+      <div id="crt-overlay" aria-hidden />
+      <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/projetos" element={<Projects />} />
       <Route path="/lab" element={<Lab />} />
@@ -17,6 +24,7 @@ export default function App() {
       <Route path="/studio" element={<Studio />} />
       <Route path="/studio/:projectId" element={<Studio />} />
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+      </Routes>
+    </>
   );
 }

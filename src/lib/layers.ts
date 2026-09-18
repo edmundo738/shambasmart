@@ -1,4 +1,4 @@
-import { DEFAULT_FRAME_MS, Frame, FrameAnchor, FrameHitbox, Layer, PlayMode, ProjectData, uid } from '../types';
+import { Bone, DEFAULT_FRAME_MS, Frame, FrameAnchor, FrameHitbox, Layer, PlayMode, ProjectData, uid } from '../types';
 import { clampMs, fpsToMs } from './timeline';
 import { clampAnchor, normalizeHitbox } from './frameMeta';
 import { emptyCells } from './pixels';
@@ -126,6 +126,30 @@ export function migrateProject(p: ProjectData): ProjectData {
     animsChanged = true;
     return { ...a, playMode: 'loop' as PlayMode };
   });
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+  let rigChanged = false;
+  let rig: Bone[];
+  const rawRig = (p as { rig?: unknown }).rig;
+  if (Array.isArray(rawRig)) {
+    rig = [];
+    for (const b of rawRig as Bone[]) {
+      if (!b || typeof b !== 'object' || typeof b.id !== 'string' || !b.id) {
+        rigChanged = true;
+        continue;
+      }
+      const clean: Bone = {
+        id: b.id,
+        name: typeof b.name === 'string' && b.name ? b.name.slice(0, 24) : 'osso',
+        parentId: typeof b.parentId === 'string' ? b.parentId : null,
+        x: num(b.x), y: num(b.y), rotation: num(b.rotation), length: Math.max(0, num(b.length)),
+      };
+      rig.push(clean);
+      if (JSON.stringify(b) !== JSON.stringify(clean)) rigChanged = true;
+    }
+  } else {
+    rig = [];
+    rigChanged = true;
+  }
   if (raw.layers && raw.layers.length > 0) {
     let changed = false;
     const frames: Record<string, Frame> = {};
@@ -140,8 +164,8 @@ export function migrateProject(p: ProjectData): ProjectData {
         changed = true;
       }
     }
-    if (!changed && !animsChanged) return p;
-    return { ...p, frames, animations };
+    if (!changed && !animsChanged && !rigChanged) return p;
+    return { ...p, frames, animations, rig };
   }
   const layer = createLayer('Camada 1');
   const frames: Record<string, Frame> = {};
@@ -153,5 +177,5 @@ export function migrateProject(p: ProjectData): ProjectData {
       ...legacyMeta(f),
     };
   }
-  return { ...p, layers: [layer], frames, animations };
+  return { ...p, layers: [layer], frames, animations, rig };
 }

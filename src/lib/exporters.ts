@@ -350,6 +350,9 @@ export async function buildPackZip(project: ProjectData, opts: PackOpts): Promis
       name: anim.name, fps: anim.fps, frames: frames.length,
       playMode: anim.playMode ?? 'loop',
       durationsMs: durationsOf(anim, project.frames),
+      poses: Object.fromEntries(
+        frames.map((f, i) => [i, f.pose]).filter(([, q]) => q && Object.keys(q).length),
+      ),
       variations: combos.map((c) => c.name),
     });
   }
@@ -361,6 +364,7 @@ export async function buildPackZip(project: ProjectData, opts: PackOpts): Promis
     scale: opts.scale,
     engine: opts.engine,
     animations: manifestAnims,
+    rig: project.rig ?? [],
     naming: '<animacao>__<variacao>.<ext> e <animacao>__<variacao>_f<NN>.png por frame',
   }, null, 2));
 
@@ -372,7 +376,7 @@ export async function buildPackZip(project: ProjectData, opts: PackOpts): Promis
     `- <animacao>__<variacao>.json ....... metadados (${opts.engine})\n` +
     `- <animacao>__<variacao>.gif ........ prévia animada\n` +
     `- <animacao>__<variacao>_frames/ .... frames individuais f00, f01, ...\n` +
-    `- pack.json ......................... manifesto com fps e ordem dos frames\n\n` +
+    `- pack.json ......................... manifesto com fps, ordem dos frames, rig e poses\n\n` +
     `COMO USAR:\n` +
     `- Godot: importe o PNG e use AtlasTexture/AnimatedSprite2D seguindo o pack.json.\n` +
     `- Unity: importe como Sprite (Multiple) e fatie pela grade.\n` +

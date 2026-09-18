@@ -26,6 +26,30 @@ export interface FrameHitbox {
   h: number;
 }
 
+/**
+ * Osso do esqueleto-guia (repouso). x/y = posição local relativa à junta do pai
+ * (raízes usam coords do canvas); rotation em graus; corpo vai da junta ao tip (+X local).
+ */
+export interface Bone {
+  id: string;
+  name: string;
+  parentId: string | null;
+  x: number;
+  y: number;
+  rotation: number;
+  length: number;
+}
+
+/** Pose de um osso num frame: local absoluto (x, y, rotação). */
+export interface BonePose {
+  x: number;
+  y: number;
+  rotation: number;
+}
+
+/** Pose do frame: esparsa — só ossos que diferem do repouso. */
+export type FramePose = Record<string, BonePose>;
+
 export interface Frame {
   id: string;
   /** cel por layer: layerId -> pixels (frame × layer = cel) */
@@ -36,6 +60,8 @@ export interface Frame {
   anchors: FrameAnchor[];
   /** hitbox do frame (null = sem colisão) */
   hitbox: FrameHitbox | null;
+  /** pose do esqueleto neste frame (ausente = repouso) */
+  pose?: FramePose;
 }
 
 /** Timing padrão (100ms = 10fps) e limites do editor. */
@@ -89,13 +115,15 @@ export interface ProjectData {
   animations: Animation[];
   variations: Variation[];
   palette: string[];
+  /** esqueleto-guia do projeto (FK); vazio = sem rig */
+  rig: Bone[];
   recipe?: AssetRecipe;
   bundle?: string;
   createdAt: number;
   updatedAt: number;
 }
 
-export type ToolId = 'brush' | 'eraser' | 'fill' | 'picker' | 'line' | 'rect' | 'ellipse' | 'select' | 'meta';
+export type ToolId = 'brush' | 'eraser' | 'fill' | 'picker' | 'line' | 'rect' | 'ellipse' | 'select' | 'meta' | 'bone';
 
 /** Seleção retangular (coordenadas inclusivas, normalizadas: x0<=x1, y0<=y1). */
 export interface SelRect {

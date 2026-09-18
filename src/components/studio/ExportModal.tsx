@@ -80,7 +80,7 @@ export default function ExportModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto thin-scroll rounded-2xl border border-ink-600 bg-ink-900 p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto thin-scroll cabinet rounded-2xl bg-ink-900 p-6" onClick={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-forge-500 to-pixel-500 text-ink-950">
             <Box size={20} />
@@ -171,7 +171,7 @@ export default function ExportModal({ onClose }: { onClose: () => void }) {
           <button
             onClick={doExport}
             disabled={busy || (!includeSheet && !includeGif && !includeSequence)}
-            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-forge-500 to-pixel-500 px-4 py-3 text-sm font-bold text-ink-950 hover:brightness-110 disabled:opacity-40"
+            className="flex flex-1 items-center justify-center gap-2 btn-arcade pixel-corners-sm bg-gradient-to-r from-forge-500 to-pixel-500 px-4 py-3 text-sm font-bold text-ink-950 hover:brightness-110 disabled:opacity-40"
           >
             {busy ? <Loader2 size={17} className="animate-spin" /> : <Download size={17} />}
             {busy ? 'Forjando pack...' : `Baixar ZIP (${stats.files} arq.)`}

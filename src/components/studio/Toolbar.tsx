@@ -1,5 +1,5 @@
 import {
-  Anchor, BoxSelect, Brush, Circle, Crosshair, Eraser, FlipHorizontal2, FlipVertical2, Ghost, Grid3x3, PaintBucket, Pipette,
+  Anchor, Bone, BoxSelect, Brush, Circle, Crosshair, Eraser, FlipHorizontal2, FlipVertical2, Ghost, Grid3x3, PaintBucket, Pipette,
   Slash, Square,
 } from 'lucide-react';
 import { useStudio } from '../../store/studio';
@@ -12,6 +12,7 @@ const TOOLS: Array<{ id: ToolId; icon: React.ReactNode; label: string; hint: str
   { id: 'picker', icon: <Pipette size={18} />, label: 'Conta-gotas', hint: 'I' },
   { id: 'select', icon: <BoxSelect size={18} />, label: 'Selecionar', hint: 'M' },
   { id: 'meta', icon: <Anchor size={18} />, label: 'Âncoras', hint: 'T' },
+  { id: 'bone', icon: <Bone size={18} />, label: 'Ossos', hint: 'N' },
   { id: 'line', icon: <Slash size={18} />, label: 'Linha', hint: 'L' },
   { id: 'rect', icon: <Square size={18} />, label: 'Retângulo', hint: 'R' },
   { id: 'ellipse', icon: <Circle size={18} />, label: 'Elipse', hint: 'O' },
@@ -34,14 +35,14 @@ export default function Toolbar() {
   const toggleOnion = useStudio((s) => s.toggleOnion);
 
   const btn = (active: boolean) =>
-    `flex h-10 w-10 items-center justify-center rounded-lg border transition-colors ${
+    `flex h-10 w-10 items-center justify-center rounded-md border transition-all ${
       active
-        ? 'border-forge-500 bg-forge-500/20 text-forge-300 shadow-glow'
-        : 'border-transparent text-slate-400 hover:border-ink-600 hover:bg-ink-800 hover:text-slate-100'
+        ? 'border-forge-400 bg-forge-500/25 text-forge-200 shadow-glow'
+        : 'border-transparent text-slate-400 hover:border-ink-600 hover:bg-ink-800 hover:text-slate-100 active:translate-y-px'
     }`;
 
   return (
-    <div className="flex w-14 flex-col items-center gap-1 rounded-xl border border-ink-700 bg-ink-900/80 p-2">
+    <div className="pf-shadow flex w-14 flex-col items-center gap-1 rounded-xl border border-ink-700 bg-ink-900/90 p-2">
       {TOOLS.map((t) => (
         <button key={t.id} title={`${t.label} (${t.hint})`} onClick={() => setTool(t.id)} className={btn(tool === t.id)}>
           {t.icon}
