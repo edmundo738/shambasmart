@@ -189,6 +189,7 @@ export default function CanvasStage() {
   const anim = project.animations.find((a) => a.id === currentAnimationId) ?? project.animations[0];
   const frameIdx = anim && currentFrameId ? anim.frameIds.indexOf(currentFrameId) : -1;
   const layerName = project.layers.find((l) => l.id === currentLayerId)?.name ?? '—';
+  const projectionLabel = project.projection?.id && project.projection.id !== '2d' ? ` · guia ${project.projection.id}` : '';
   const ghost = live ? anchorOffset(live.anchor, project.width, project.height, live.w, live.h) : null;
 
   return (
@@ -264,6 +265,7 @@ export default function CanvasStage() {
         {' · '}F{frameIdx + 1}/{anim?.frameIds.length ?? 0}
         {' · '}{layerName}
         {' · '}{TOOL_LABEL[tool]}
+        {projectionLabel}
         {' · '}PP:{pixelPerfect ? <span className="text-pixel-400">on</span> : 'off'}
       </div>
 

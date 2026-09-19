@@ -12,6 +12,8 @@ import AnimationsPanel from '../components/studio/AnimationsPanel';
 import VariationsPanel from '../components/studio/VariationsPanel';
 import PalettePanel from '../components/studio/PalettePanel';
 import PreviewPanel from '../components/studio/PreviewPanel';
+import { ProjectionPanel } from '../components/studio/ProjectionPanel';
+import CommandPalette from '../components/studio/CommandPalette';
 import RecipeCard from '../components/studio/RecipeCard';
 import MasterPanel from '../components/studio/MasterPanel';
 import LayersPanel from '../components/studio/LayersPanel';
@@ -29,6 +31,7 @@ export default function Studio() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<LeftTab>('anim');
   const [exportOpen, setExportOpen] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
   const [ready, setReady] = useState(false);
 
   const project = useStudio((s) => s.project);
@@ -88,6 +91,11 @@ export default function Studio() {
   /* ------------------------------ atalhos ---------------------------------- */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setCommandOpen(true);
+        return;
+      }
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return;
       if (e.defaultPrevented) return; // PixelCanvas já tratou (ex.: Esc cancela arrasto)
@@ -219,7 +227,7 @@ export default function Studio() {
 
   return (
     <div className="flex h-full flex-col bg-ink-950">
-      <TopBar onExport={() => setExportOpen(true)} />
+      <TopBar onExport={() => setExportOpen(true)} onCommand={() => setCommandOpen(true)} />
       <ToolOptions />
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 lg:flex-row lg:overflow-hidden">
@@ -258,6 +266,7 @@ export default function Studio() {
 
         {/* painel direito */}
         <aside className="thin-scroll flex w-full shrink-0 flex-col gap-3 overflow-y-auto lg:w-80">
+          <ProjectionPanel />
           <LayersPanel />
           <MetaPanel />
           <BonesPanel />
@@ -278,6 +287,7 @@ export default function Studio() {
 
       {exportOpen && <ExportModal onClose={() => setExportOpen(false)} />}
       {canvasDialogOpen && <CanvasSizeModal />}
+      {commandOpen && <CommandPalette onClose={() => setCommandOpen(false)} />}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import {
   Animation, BlendMode, Bone, BonePose, Cell, Frame, FrameAnchor, FrameHitbox, FramePose, Layer, ORIGINAL_VARIATION_ID, PlayMode,
-  ProjectData, SelRect, SelectionShape, ToolId, TransformMode, Variation, uid,
+  ProjectData, ProjectionSettings, SelRect, SelectionShape, ToolId, TransformMode, Variation, uid,
 } from '../types';
 import { emptyCells } from '../lib/pixels';
 import {
@@ -21,6 +21,7 @@ import {
   translateHitbox, translateMap, translateSel,
 } from '../lib/canvas';
 import { TEMPLATES } from '../lib/templates';
+import { normalizeProjection } from '../lib/spatial';
 
 interface HistorySnap {
   frames: Record<string, Frame>;
@@ -29,6 +30,7 @@ interface HistorySnap {
   palette: string[];
   variations: Variation[];
   rig: Bone[];
+  projection?: ProjectionSettings;
 }
 
 function snap(project: ProjectData): HistorySnap {
@@ -39,6 +41,7 @@ function snap(project: ProjectData): HistorySnap {
     palette: [...project.palette],
     variations: JSON.parse(JSON.stringify(project.variations)),
     rig: JSON.parse(JSON.stringify(project.rig ?? [])),
+    projection: project.projection ? normalizeProjection(project.projection) : undefined,
   };
 }
 
@@ -114,6 +117,7 @@ interface StudioState {
   setOnionTintPrev: (c: string) => void;
   setOnionTintNext: (c: string) => void;
   setZoom: (z: number) => void;
+  setProjection: (patch: Partial<ProjectionSettings>) => void;
   viewportRequest: { kind: 'fit' | 'z100' | 'z200'; n: number } | null;
   requestViewport: (kind: 'fit' | 'z100' | 'z200') => void;
   clearViewport: () => void;
@@ -450,7 +454,8 @@ export const useStudio = create<StudioState>((set, get) => ({
   dirty: false,
 
   loadProject: (p) => {
-    const project = migrateProject(p);
+    const migrated = migrateProject(p);
+    const project = { ...migrated, projection: normalizeProjection(migrated.projection) };
     return set({
     project,
     currentAnimationId: project.animations[0]?.id ?? null,
@@ -484,6 +489,7 @@ export const useStudio = create<StudioState>((set, get) => ({
       variations: [],
       palette: ['#10131d', '#ffffff', '#ff4d6d', '#ff8a00', '#ffd23f', '#8ee000', '#3fd65f', '#22b8f0'],
       rig: [],
+      projection: normalizeProjection(),
       createdAt: now, updatedAt: now,
     };
     get().loadProject(project);
@@ -501,6 +507,7 @@ export const useStudio = create<StudioState>((set, get) => ({
       variations: [],
       palette: built.palette,
       rig: [],
+      projection: normalizeProjection(),
       createdAt: now, updatedAt: now,
     };
     get().loadProject(project);
@@ -531,6 +538,17 @@ export const useStudio = create<StudioState>((set, get) => ({
   setOnionTintPrev: (c) => set({ onionTintPrev: c }),
   setOnionTintNext: (c) => set({ onionTintNext: c }),
   setZoom: (zoom) => set({ zoom: clampZoom(zoom) }),
+  setProjection: (patch) => set((s) => {
+    if (!s.project) return {};
+    const next = normalizeProjection({ ...normalizeProjection(s.project.projection), ...patch });
+    const current = normalizeProjection(s.project.projection);
+    if (JSON.stringify(next) === JSON.stringify(current)) return {};
+    return {
+      ...pushHistory(s),
+      project: { ...s.project, projection: next, updatedAt: Date.now() },
+      dirty: true,
+    };
+  }),
   requestViewport: (kind) => set((s) => ({ viewportRequest: { kind, n: (s.viewportRequest?.n ?? 0) + 1 } })),
   clearViewport: () => set({ viewportRequest: null }),
   setPanHeld: (panHeld) => set({ panHeld }),
@@ -1698,6 +1716,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     const palette = restorePalette(prev);
     const variations = restoreVariations(prev);
     const rig = restoreRig(prev);
+    const projection = prev.projection ? normalizeProjection(prev.projection) : normalizeProjection();
     // revalida seleção
     let { currentAnimationId, currentFrameId } = s;
     if (!animations.some((a) => a.id === currentAnimationId)) {
@@ -1715,7 +1734,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     }
     return {
       past, future,
-      project: { ...s.project, frames, animations, layers, palette, variations, rig, updatedAt: Date.now() },
+      project: { ...s.project, frames, animations, layers, palette, variations, rig, projection, updatedAt: Date.now() },
       currentAnimationId, currentFrameId, currentLayerId, dirty: true,
     };
   }),
@@ -1730,6 +1749,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     const palette = restorePalette(next);
     const variations = restoreVariations(next);
     const rig = restoreRig(next);
+    const projection = next.projection ? normalizeProjection(next.projection) : normalizeProjection();
     let { currentAnimationId, currentFrameId } = s;
     if (!animations.some((a) => a.id === currentAnimationId)) {
       currentAnimationId = animations[0]?.id ?? null;
@@ -1746,7 +1766,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     }
     return {
       past, future,
-      project: { ...s.project, frames, animations, layers, palette, variations, rig, updatedAt: Date.now() },
+      project: { ...s.project, frames, animations, layers, palette, variations, rig, projection, updatedAt: Date.now() },
       currentAnimationId, currentFrameId, currentLayerId, dirty: true,
     };
   }),

@@ -20,6 +20,7 @@ import { angleTo, distToSegment, normalizeDeg, snapWorldBone, solveFK, worldToLo
 import { cellFromView, posFromView } from '../../lib/viewport';
 import { ellipseMask, lassoMask, pointInMask, rectMask } from '../../lib/selection';
 import { ditherColor } from '../../lib/colorTools';
+import { projectionGrid } from '../../lib/spatial';
 
 export default function PixelCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -137,6 +138,20 @@ export default function PixelCanvas() {
       };
       if (zoom * gridSize >= 6) tier(gridSize, 'rgba(255,255,255,0.07)');
       if (zoom * gridSize * 8 >= 8) tier(gridSize * 8, 'rgba(255,255,255,0.16)');
+
+      // Guia espacial verificável: desenha eixos sobre o raster, sem mudar
+      // a matriz de pixels nem transformar a edição em um editor 3D.
+      const guide = projectionGrid(w, h, project.projection);
+      if (guide.length) {
+        ctx.strokeStyle = 'rgba(255,210,63,0.22)';
+        ctx.lineWidth = Math.max(1, Math.min(2, zoom / 10));
+        ctx.beginPath();
+        for (const segment of guide) {
+          ctx.moveTo(segment.a.x * zoom + 0.5, segment.a.y * zoom + 0.5);
+          ctx.lineTo(segment.b.x * zoom + 0.5, segment.b.y * zoom + 0.5);
+        }
+        ctx.stroke();
+      }
     }
   }, [project, frame, frameIndex, currentAnimationId, zoom, showGrid, gridSize, onionSkin, onionPrev, onionNext, onionOpacity, onionTintPrev, onionTintNext]);
 

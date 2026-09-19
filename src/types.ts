@@ -4,6 +4,22 @@ export type Cell = string;
 export type LayerKind = 'raster' | 'group';
 export type BlendMode = 'normal' | 'multiply' | 'screen' | 'overlay' | 'add';
 
+/** Projeção do guia espacial. O raster continua pixel-perfect e 2D; a projeção é metadata + guia. */
+export type ProjectionId = '2d' | 'side' | 'top-down' | 'three-quarter' | 'isometric' | 'dimetric' | 'oblique';
+
+export interface ProjectionSettings {
+  id: ProjectionId;
+  tileWidth: number;
+  tileHeight: number;
+  snap: boolean;
+  originX: number;
+  originY: number;
+}
+
+export const DEFAULT_PROJECTION: ProjectionSettings = {
+  id: '2d', tileWidth: 2, tileHeight: 1, snap: true, originX: 0, originY: 0,
+};
+
 export interface Layer {
   id: string;
   name: string;
@@ -129,6 +145,8 @@ export interface ProjectData {
   palette: string[];
   /** esqueleto-guia do projeto (FK); vazio = sem rig */
   rig: Bone[];
+  /** metadata opcional da fundação espacial; ausente = projeção 2D legada */
+  projection?: ProjectionSettings;
   recipe?: AssetRecipe;
   bundle?: string;
   createdAt: number;

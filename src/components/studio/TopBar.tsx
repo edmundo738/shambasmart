@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Check, Cloud, Download, FlaskConical, Redo2, Undo2, User as UserIcon } from 'lucide-react';
+import { ArrowLeft, Check, Cloud, Command, Download, FlaskConical, Redo2, Undo2, User as UserIcon } from 'lucide-react';
 import { useStudio } from '../../store/studio';
 import { useAuth } from '../../store/auth';
 import AuthModal from '../AuthModal';
 
-export default function TopBar({ onExport }: { onExport: () => void }) {
+export default function TopBar({ onExport, onCommand }: { onExport: () => void; onCommand?: () => void }) {
   const project = useStudio((s) => s.project);
   const renameProject = useStudio((s) => s.renameProject);
   const dirty = useStudio((s) => s.dirty);
@@ -67,6 +67,7 @@ export default function TopBar({ onExport }: { onExport: () => void }) {
 
       <div className="flex-1" />
 
+      {onCommand && <button onClick={onCommand} title="Command palette (Ctrl+K)" className="hidden h-9 items-center gap-1.5 rounded-lg border border-ink-600 px-2.5 font-mono text-[10px] text-slate-400 hover:border-pixel-500 hover:text-pixel-300 md:flex"><Command size={14} /> <kbd>⌘K</kbd></button>}
       <button onClick={undo} disabled={!canUndo} title="Desfazer (Ctrl+Z)" className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-ink-800 hover:text-white disabled:opacity-30">
         <Undo2 size={17} />
       </button>
